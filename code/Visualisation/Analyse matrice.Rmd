@@ -1,0 +1,194 @@
+---
+title: "Untitled"
+author: "GUILHEM"
+date: "2026-07-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(stringr)
+library(purrr)
+
+root <- "C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/matrix/resultat"
+
+# Liste de tous les CSV, récursivement
+fox_2 = read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/matrix/resultat/parallele/fox_2/O3/result.csv")
+
+fox_3 = read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/matrix/resultat/parallele/fox_3/O3/result.csv")
+
+# Racine
+root <- "C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/matrix/resultat/parallele"
+
+#opt
+
+fox_2_00  <- read.csv(paste0(root, "/fox_2/O0/result.csv"))
+fox_2_01  <- read.csv(paste0(root, "/fox_2/O1/result.csv"))
+fox_2_02  <- read.csv(paste0(root, "/fox_2/O2/result.csv"))
+fox_2_0fast  <- read.csv(paste0(root, "/fox_2/Ofast/result.csv"))
+
+# FOX
+fox_2  <- read.csv(paste0(root, "/fox_2/O3/result.csv"))
+fox_3  <- read.csv(paste0(root, "/fox_3/O3/result.csv"))
+fox_cop <- read.csv(paste0(root, "/fox_cop/O3/result.csv"))
+
+# SUMMA
+SUMMA      <- read.csv(paste0(root, "/SUMMA_/O3/result.csv"))
+#SUMMA_vect <- read.csv(paste0(root, "/SUMMA_vect/O3/result.csv"))
+
+# Cannon
+cannon_2 <- read.csv(paste0(root, "/cannon_2/O3/result.csv"))
+
+# Multiplications parallèles
+mlt_mat_prl_blk <- read.csv(paste0(root, "/mlt_mat_prl_blk/O3/result.csv"))
+mlt_prl_fox_2   <- read.csv(paste0(root, "/mlt_prl_fox_2/O3/result.csv"))
+mult_bcast      <- read.csv(paste0(root, "/mult_bcast/O3/result.csv"))
+mult_bcast_blk  <- read.csv(paste0(root, "/mult_bcast_blk/O3/result.csv"))
+mult_mat_paral  <- read.csv(paste0(root, "/mult_mat_paral/O3/result.csv"))
+mult_send_rcv_replace <- read.csv(paste0(root, "/mult_send_rcv_replace/O3/result.csv"))
+
+
+```
+
+
+Analyse des effet des optimisation
+
+```{r}
+
+fox_opt = rbind(fox_2_0fast,fox_2_01,fox_2_02,fox_2,fox_2_00)
+
+Mean_res = fox_opt %>% group_by(exec,opt,size,np) %>%
+  summarise(G_time = mean(global_time),G_energie= mean(global_energy),G_power = mean(global_power),A_time = mean(algo_time),A_energie = mean(algo_energy),A_power = mean(algo_power),.groups =  "drop")
+```
+
+```{r}
+df_time <- Mean_res %>% 
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>np :", np,
+      #"<br>size blk :", block,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )
+
+p <- ggplot(df_time, aes(
+  x = size,
+  y = A_time,
+  color = factor(opt),
+  group = opt,
+  text = tooltip
+)) +
+  facet_wrap(~np)+
+  geom_line() +
+  geom_point() +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(y = "Temps (s)", color = "OPT") +
+  theme_minimal()+
+  labs(title="Optimisation sur FOX 2")
+
+ggplotly(p,tooltip ="text")
+
+
+```
+
+On peut voir ici que dans cette algorithme là l'optimisation O0 est presque systématiquement moins performante que les autres, pour les autres version justement les differences ne sont generalement pas si importante. L'analyse de l'optimisation dans les differents algorithme qui ont pu etre tester donne généralement cette meme tendence de facon plus ou moin marqué, on observe parfois un aventage pour la version Ofast mais cette derniere est tres variable et peux dans certains cas avoir des performance se raprochant plus de O0 (la pire optimisattion en général) que de O3, c'est pour cela que par la suite nous allons nous concentré sur l'optimisation O3.
+On remarque que en general O0 est 2 fois moins rapide, meme ci il y certains cas assez rare ou elle parvient a prendre un peu d'avence.
+
+Sur le plan de l'energie on observe le meme phonomene que pour le temps.
+
+
+```{r}
+
+fox_v = rbind(fox_2,fox_3)
+
+Mean_res = fox_v %>% group_by(exec,opt,size,np) %>%
+  summarise(G_time = mean(global_time),G_energie= mean(global_energy),G_power = mean(global_power),A_time = mean(algo_time),A_energie = mean(algo_energy),A_power = mean(algo_power),.groups =  "drop")
+
+df_time <- Mean_res %>% 
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>np :", np,
+      #"<br>size blk :", block,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )
+
+p <- ggplot(df_time, aes(
+  x = size,
+  y = G_time,
+  color = factor(exec),
+  group = exec,
+  text = tooltip
+)) +
+  facet_wrap(~np)+
+  geom_line() +
+  geom_point() +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(y = "Temps (s)", color = "exec") +
+  theme_minimal()+
+  labs(title="Variation celon les fox")
+
+ggplotly(p,tooltip ="text")
+
+```
+
+```{r}
+
+mpi_avx = mpi_avx %>% mutate(threads = 1) %>% mutate(block = 1)
+mpi_omp = mpi_omp %>% mutate(block = 1) %>% mutate(threads = 4)
+mpi_omp_avx = mpi_omp_avx %>% mutate(block = 1) %>% mutate(threads = 4)
+
+mpi_omp_avx_blk_tr = mpi_omp_avx_blk_tr %>% mutate(threads = 4)
+
+seq_blk = seq_blk %>% mutate(threads  =1) %>% mutate(np = 1)
+
+Bench_2 = rbind(mpi_avx,mpi,mpi_omp,mpi_omp_avx,mpi_omp_avx_blk_tr,seq_blk)
+
+Mean_res = Bench_2 %>% group_by(exec,np,threads,size,block) %>%
+  summarise(G_time = mean(GT),G_energie= mean(GE),G_power = mean(GP),A_time = mean(AT),A_energie = mean(AE),A_power = mean(AP),.groups =  "drop");
+```
+
+```{r}
+Mean_res2 <- Mean_res %>%
+  mutate(exec = ifelse(exec == "mpi_omp_avx", "mpi_omp_vect", exec))
+
+p <- Mean_res2 %>% 
+    filter(exec %in% c("mpi_omp","mpi_omp_vect")) %>% 
+    ggplot(aes(
+      x = size,
+      y = A_energie,
+      color = factor(exec),
+      group = exec,
+      text = paste(
+        "Algo :", exec,
+        "<br>np :", np,
+        "<br>size :", size,
+        "<br>% block :", block,
+        "<br>Temps :", round(A_time, 3), "s",
+        "<br>Énergie :", round(A_energie, 3), "J",
+        "<br>Power :", round(A_power, 3)
+      )
+    )) +
+    geom_line() +
+    geom_point() +
+    labs(color = "Block") +
+    theme_minimal()
+
+ggplotly(p)
+
+
+```
+
+

@@ -1,0 +1,168 @@
+---
+title: "analyse_JDLV"
+author: "GUILHEM"
+date: "2026-07-01"
+output: html_document
+---
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(plotly)
+library(dplyr)
+library(knitr)
+library(readr)
+plot_auto <- function(p) {
+  if (knitr::is_html_output()) {
+    ggplotly(p, tooltip = "text")
+  } else {
+    p
+  }
+}
+
+```
+
+##Importation des donnees
+```{r}
+path <- "C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/JDLV/results/results"
+
+files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
+
+fix_columns <- function(df) {
+    if (!"block" %in% names(df))   df$block   <- 1
+    if (!"np" %in% names(df))      df$np      <- 1
+    if (!"threads" %in% names(df)) df$threads <- 1
+    df
+}
+
+datasets <- lapply(files, function(f) {
+    df <- read.csv(f)
+    fix_columns(df)
+})
+
+names(datasets) <- tools::file_path_sans_ext(basename(files))
+
+
+Bench_2 <- read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/JDLV/results/global.csv")
+Bench_2$exec <- paste0(Bench_2$exec, "_B0")
+
+all_data <- bind_rows(datasets)
+
+for (i in seq_along(files)) {
+    name <- tools::file_path_sans_ext(basename(files[i]))
+    assign(name, datasets[[i]])
+}
+
+Mean_res = all_data %>% group_by(exec,opt,size,nb_it,block,np,threads) %>%
+  summarise(G_time = mean(GT),G_energie= mean(GE),G_power = mean(GP),A_time = mean(AT),A_energie = mean(AE),A_power = mean(AP),.groups =  "drop")
+
+Mean_res= rbind(Mean_res,Bench_2)
+
+
+```
+
+On peut a present commencer l'analyse, premierement l'effet des optimisation :
+
+```{r}
+
+#on a ici la version de base avec les free malloc incessant
+df_plot <- Mean_res %>% 
+  filter(exec == "seq__B0") %>% 
+  filter(nb_it < 10000) %>% 
+  filter(size == 2048) %>%
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nbit :", nb_it,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>% 
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>% 
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- ggplot(df_plot, aes(
+  x = nb_it,
+  y = value,
+  color = factor(opt),
+  group = opt,
+  text = tooltip
+)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(
+    ~ metric,
+    ncol = 1,
+    scales = "free_y",
+    labeller = as_labeller(c(
+      A_time = "Temps (s)",
+      A_energie = "Énergie (J)"
+    ))
+  ) +
+  theme_minimal()
+
+ggplotly(p,tooltip = "text")
+
+```
+
+
+
+
+
+```{r}
+df_time <- Mean_res %>%
+  filter(exec %in% c("seq_block","seq_block_B0")) %>%
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>np : ",np,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nbit :", nb_it,
+      "<br>size blk :", block,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )
+
+p_time <- ggplot(df_time, aes(
+  x = nb_it,
+  y = A_time,
+  color = factor(size),
+  group = block,
+  text = tooltip
+)) +
+  facet_wrap(~exec)+
+  geom_line() +
+  geom_point() +
+  scale_y_log10() +
+  labs(y = "Temps (s)", color = "Block size") +
+  scale_x_log10() +
+  theme_minimal()
+
+ggplotly(p_time, tooltip = "text")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

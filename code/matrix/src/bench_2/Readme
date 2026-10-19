@@ -1,0 +1,30 @@
+Dans ce benchmark on va tester les element suivant : 
+
+Tout est ici compiler avec -O3 !
+
+compilation : make all
+run global : make run
+
+
+Open_mp : 
+    Test classique :
+        make run_omp
+    Test avec le blocking :
+        make run_omp_blk
+
+OpenMP X vecto :
+    Test openmp + vectorisation (sans le blocking):
+        make run_avx_omp
+    
+Mpi X OpenMP :
+    Test de SUMMA avec OpenMP :
+        make run_mpi_omp
+
+MPI X OpenMP X blocking X vectorisation :
+    Test de la version complete sur summa avec mpi + omp + blocking + vectorisation manuelle
+        make run_mpi_avx_fs
+
+
+Les autres commandes de bench presentent dans le makefile sont des artefacts, 
+j'ai preferé les laisser pour eviter d'eventuels bugs
+

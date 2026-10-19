@@ -1,0 +1,25 @@
+Dans ce benchmark on va tester les element suivant : 
+
+Tout est ici compiler avec -O3 !
+
+Le but de ce benchmark et de tester la transposition sur differente implementation.
+
+compilation : make all
+netoyage : make clean
+
+
+Seq : 
+    Test sans blocking :
+        make run_seq
+    Test avec blocking:
+        make run_seq_bliock
+    Test avec vectorisation manuelle :
+        make run_avx_tr
+
+MPI (utiliastion de SUMMA): 
+    Test de base :
+        make run_mpi
+    Test avec vectorisation manuelle (sans blocking):
+        make run_mpi_avx
+    Test avec vectorisation manuelle et avec blocking:
+        make run_mpi_avx_blk

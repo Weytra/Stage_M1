@@ -1,0 +1,30 @@
+Dans ce benchmark on va tester les element suivant : 
+
+Tout est ici compiler avec -O3 !
+
+compilation : make all
+run global : make run
+
+Sequentielle : 
+    Test classique :
+        make run_seq
+    Test du blocking :
+        make run_seq_block
+    Test de la vectorisation : 
+        make run_avx
+    Test de la vectorisation sur matrice transposé :
+        make run_avx_tr
+
+Mpi :
+    Test de SUMMA (classique) :
+        make run_mpi
+
+MPI_AVX : 
+    Test de SUMMA avec vectorisation manuelle : 
+        make run_mpi_avx
+    Test de SUMMA avec vectorisation manuelle ET blocking :
+        make run_mpi_avx_blk
+
+Les autres commandes de bench presentent dans le makefile sont des artefacts, 
+j'ai preferé les laisser pour eviter d'eventuels bugs
+

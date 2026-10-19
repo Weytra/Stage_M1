@@ -1,0 +1,83 @@
+.
+├── Makefile
+├── Makefile.src
+├── arbre.txt
+├── bin
+│   ├── mpi
+│   │   ├── mpi_exec_O0
+│   │   ├── mpi_exec_O1
+│   │   ├── mpi_exec_O2
+│   │   ├── mpi_exec_O3
+│   │   └── mpi_exec_Ofast
+│   ├── omp
+│   │   ├── infect_omp_O0
+│   │   ├── infect_omp_O1
+│   │   ├── infect_omp_O2
+│   │   ├── infect_omp_O3
+│   │   └── infect_omp_Ofast
+│   └── seq
+│       ├── infect_O0
+│       ├── infect_O1
+│       ├── infect_O2
+│       ├── infect_O3
+│       └── infect_Ofast
+├── include
+│   ├── headers
+│   │   ├── Fonctions.h
+│   │   ├── Structures.h
+│   │   ├── energy_monitor.h
+│   │   ├── fonctions_mpi.h
+│   │   └── gest_arg.h
+│   └── sources
+│       ├── Fonctions.c
+│       ├── Fonctions_O0.o
+│       ├── Fonctions_O1.o
+│       ├── Fonctions_O2.o
+│       ├── Fonctions_O3.o
+│       ├── Fonctions_Ofast.o
+│       ├── energy_monitor.c
+│       ├── energy_monitor_O0.o
+│       ├── energy_monitor_O1.o
+│       ├── energy_monitor_O2.o
+│       ├── energy_monitor_O3.o
+│       ├── energy_monitor_Ofast.o
+│       ├── fonctions_mpi.c
+│       ├── fonctions_mpi_O0.o
+│       ├── fonctions_mpi_O1.o
+│       ├── fonctions_mpi_O2.o
+│       ├── fonctions_mpi_O3.o
+│       ├── fonctions_mpi_Ofast.o
+│       ├── gest_arg.c
+│       ├── gest_arg_O0.o
+│       ├── gest_arg_O1.o
+│       ├── gest_arg_O2.o
+│       ├── gest_arg_O3.o
+│       └── gest_arg_Ofast.o
+├── results
+│   ├── infect_mpi.csv
+│   ├── infect_omp.csv
+│   └── infect_seq.csv
+└── src
+    ├── mpi
+    │   ├── infect_mpi.c
+    │   ├── infect_mpi_O0.o
+    │   ├── infect_mpi_O1.o
+    │   ├── infect_mpi_O2.o
+    │   ├── infect_mpi_O3.o
+    │   └── infect_mpi_Ofast.o
+    ├── omp
+    │   ├── Infect_omp.c
+    │   ├── Infect_omp_O0.o
+    │   ├── Infect_omp_O1.o
+    │   ├── Infect_omp_O2.o
+    │   ├── Infect_omp_O3.o
+    │   └── Infect_omp_Ofast.o
+    └── seq
+        ├── Infect_seq.c
+        ├── Infect_seq_O0.o
+        ├── Infect_seq_O1.o
+        ├── Infect_seq_O2.o
+        ├── Infect_seq_O3.o
+        └── Infect_seq_Ofast.o
+
+13 directories, 68 files

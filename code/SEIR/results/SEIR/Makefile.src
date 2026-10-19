@@ -1,0 +1,150 @@
+########################################
+# COMPILATEURS
+########################################
+CC = gcc
+MPICC = mpicc
+
+########################################
+# FLAGS
+########################################
+BASEFLAGS = -march=native -funroll-loops -Iinclude/headers
+OMPFLAGS = -fopenmp
+LDFLAGS = -lm
+
+########################################
+# OPTIMISATIONS À TESTER
+########################################
+OPTS = O0 O1 O2 O3 Ofast
+
+########################################
+# PARAMÈTRES BENCHMARK
+########################################
+SIZES = 100 200 300
+NB_INDIV = 5000 10000 20000
+INFECT_PCT = 10 20 30 40 50 60
+REPEAT = 3
+
+########################################
+# DOSSIERS BINAIRES
+########################################
+BIN_DIR = bin
+SEQ_DIR = $(BIN_DIR)/seq
+OMP_DIR = $(BIN_DIR)/omp
+MPI_DIR = $(BIN_DIR)/mpi
+
+$(shell mkdir -p $(SEQ_DIR) $(OMP_DIR) $(MPI_DIR))
+
+########################################
+# SOURCES COMMUNES
+########################################
+COMMON_SRC = include/sources/Fonctions.c \
+<TAB>include/sources/energy_monitor.c \
+<TAB>include/sources/gest_arg.c
+
+########################################
+# GÉNÉRATION DES OBJETS OPTIMISÉS
+########################################
+
+# Compilation normale (gcc)
+define COMPILE_OPT
+$1_$2.o: $1.c
+<TAB>$(CC) -$(2) $(BASEFLAGS) -c $$< -o $$@
+endef
+
+# Compilation MPI (mpicc)
+define COMPILE_OPT_MPI
+$1_$2.o: $1.c
+<TAB>$(MPICC) -$(2) $(BASEFLAGS) -c $$< -o $$@
+endef
+
+# Appliquer aux fichiers communs
+$(foreach opt,$(OPTS),$(eval $(call COMPILE_OPT,include/sources/Fonctions,$(opt))))
+$(foreach opt,$(OPTS),$(eval $(call COMPILE_OPT,include/sources/energy_monitor,$(opt))))
+$(foreach opt,$(OPTS),$(eval $(call COMPILE_OPT,include/sources/gest_arg,$(opt))))
+
+# Appliquer aux fichiers SEQ / OMP
+$(foreach opt,$(OPTS),$(eval $(call COMPILE_OPT,src/seq/Infect_seq,$(opt))))
+$(foreach opt,$(OPTS),$(eval $(call COMPILE_OPT,src/omp/Infect_seq,$(opt))))
+
+# Appliquer aux fichiers MPI
+$(foreach opt,$(OPTS),$(eval $(call COMPILE_OPT_MPI,src/mpi/mpi,$(opt))))
+$(foreach opt,$(OPTS),$(eval $(call COMPILE_OPT_MPI,include/sources/fonctions_mpi,$(opt))))
+
+########################################
+# EXÉCUTABLES OPTIMISÉS
+########################################
+
+# SEQ
+SEQ_BINS = $(foreach opt,$(OPTS),$(SEQ_DIR)/infect_$(opt))
+
+$(SEQ_DIR)/infect_%: src/seq/Infect_seq_%.o \
+<TAB>include/sources/Fonctions_%.o \
+<TAB>include/sources/energy_monitor_%.o \
+<TAB>include/sources/gest_arg_%.o
+<TAB>$(CC) -$* $(BASEFLAGS) $^ $(LDFLAGS) -o $@
+
+# OMP
+OMP_BINS = $(foreach opt,$(OPTS),$(OMP_DIR)/infect_omp_$(opt))
+
+$(OMP_DIR)/infect_omp_%: src/omp/Infect_seq_%.o \
+<TAB>include/sources/Fonctions_%.o \
+<TAB>include/sources/energy_monitor_%.o \
+<TAB>include/sources/gest_arg_%.o
+<TAB>$(CC) -$* $(BASEFLAGS) $(OMPFLAGS) $^ $(LDFLAGS) -o $@
+
+# MPI
+MPI_BINS = $(foreach opt,$(OPTS),$(MPI_DIR)/mpi_exec_$(opt))
+
+$(MPI_DIR)/mpi_exec_%: src/mpi/mpi_%.o \
+<TAB>include/sources/fonctions_mpi_%.o \
+<TAB>include/sources/Fonctions_%.o \
+<TAB>include/sources/energy_monitor_%.o \
+<TAB>include/sources/gest_arg_%.o
+<TAB>$(MPICC) -$* $(BASEFLAGS) $^ $(LDFLAGS) -o $@
+
+########################################
+# RÈGLE PRINCIPALE
+########################################
+all: $(SEQ_BINS) $(OMP_BINS) $(MPI_BINS)
+
+########################################
+# BENCHMARK SEQ AVEC CALCUL POURCENTAGE
+########################################
+run_bench_seq:
+<TAB>mkdir -p results; \
+<TAB>CSV=results/infect_seq.csv; \
+<TAB>echo "exec,opt,size,nb_indiv,pct_infect,nb_infect,GT,GE,GP,AT,AE,AP" > $$CSV; \
+<TAB>for opt in $(OPTS); do \
+<TAB><TAB>BIN=$(SEQ_DIR)/infect_$${opt}; \
+<TAB><TAB>for n in $(SIZES); do \
+<TAB><TAB><TAB>for indiv in $(NB_INDIV); do \
+<TAB><TAB><TAB><TAB>for pct in $(INFECT_PCT); do \
+<TAB><TAB><TAB><TAB><TAB>INF=$$(( indiv * pct / 100 )); \
+<TAB><TAB><TAB><TAB><TAB>echo "=== SEQ $$opt $$n $$indiv $$pct% (INF=$$INF) ==="; \
+<TAB><TAB><TAB><TAB><TAB>for r in $$(seq 1 $(REPEAT)); do \
+<TAB><TAB><TAB><TAB><TAB><TAB>OUT=$$($$BIN $$n $$indiv $$INF 2>/dev/null); \
+<TAB><TAB><TAB><TAB><TAB><TAB>GT=$$(echo "$$OUT" | grep GLOBAL_TIME | cut -d= -f2); \
+<TAB><TAB><TAB><TAB><TAB><TAB>GE=$$(echo "$$OUT" | grep GLOBAL_ENERGY | cut -d= -f2); \
+<TAB><TAB><TAB><TAB><TAB><TAB>GP=$$(echo "$$OUT" | grep GLOBAL_POWER | cut -d= -f2); \
+<TAB><TAB><TAB><TAB><TAB><TAB>AT=$$(echo "$$OUT" | grep ALGO_TIME | cut -d= -f2); \
+<TAB><TAB><TAB><TAB><TAB><TAB>AE=$$(echo "$$OUT" | grep ALGO_ENERGY | cut -d= -f2); \
+<TAB><TAB><TAB><TAB><TAB><TAB>AP=$$(echo "$$OUT" | grep ALGO_POWER | cut -d= -f2); \
+<TAB><TAB><TAB><TAB><TAB><TAB>echo "seq,$$opt,$$n,$$indiv,$$pct,$$INF,$$GT,$$GE,$$GP,$$AT,$$AE,$$AP" >> $$CSV; \
+<TAB><TAB><TAB><TAB><TAB><TAB>sleep 1; \
+<TAB><TAB><TAB><TAB><TAB>done; \
+<TAB><TAB><TAB><TAB>done; \
+<TAB><TAB><TAB>done; \
+<TAB><TAB>done; \
+<TAB>done
+
+########################################
+# CLEAN
+########################################
+clean:
+<TAB>rm -f include/sources/*.o
+<TAB>rm -f src/seq/*.o
+<TAB>rm -f src/omp/*.o
+<TAB>rm -f src/mpi/*.o
+
+mrproper: clean
+<TAB>rm -f $(SEQ_BINS) $(OMP_BINS) $(MPI_BINS)

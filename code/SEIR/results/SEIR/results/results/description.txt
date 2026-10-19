@@ -1,0 +1,14 @@
+dans ces nouveau bench a analyser: 
+hybrid omp 2 ets avec la nouvelle fonction de calcul qui ce base sur celle qui marhce avec
+omp, donc parallelisation uniquemeent de ce qui ce fait bien sans surcout
+
+mpi_base : avec flags : march native et les autre mais pas de -ftree-vectorize
+idem pour seq base
+
+mpi et seq vect sont avec -ftree_vectorise
+
+omp 0 : V0 avec les free/realloc
+omp 2 : version qui parallelise que ce qui esr necessaire
+frienldy : petite struct
+NO firendly : grosse strusture
+

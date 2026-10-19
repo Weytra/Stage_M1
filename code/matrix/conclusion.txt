@@ -1,0 +1,36 @@
+l'analys de bench permet de voir que de faire de la vectorisation 
+manuelement n'apporte pas de benefice voir meme une legere penalité
+en Comparaison a l'autovectorisation faite par le compilateur.
+
+La conso energetique augmente de la meme facon que le temps lors de cette 
+vectorisation manuel
+
+
+analyse de bench2 (omp):
+    on voit clairement que openmp peux etre tres performant dans certaines 
+    situation mais de trop melanger les paradigme de programmation
+    n'apporte pas imperativement de gros gains, ici on voit que
+    le temps d'execution de mpi+open mp est beaucoup moins ineteresant que
+    mpi pure ou open mp pure blocké , en effet cette version mpi+open mp 
+    dure 3.8 s en 2048 contre 1.2 s en mpi pure (np = 9)
+    et uniquement 0.6s en openmp pure blocké, ce qui est le meilleur algo
+    de tout ceux que j'ai tester !
+    et il advient que cette derniere version openmp pure blocké est aussi celle qui
+    consome le moins d'energie avec seulement 38J consomé, contre
+    50 pour mpi pure avec summa (np = 9)
+
+    de cette visualisation la on voit que mpi + open mp n'apporte pas de
+    gain mais au contraire cause des perte, en revanche il est claire que
+    open mp est tres interesant de plus il est parfaitement compatible
+    avec les autre paradigme tel que le blockage et la vectorisation 
+    (seul mpi lui deplait sur mamachine)
+    ordre de perf en temps et energie: 
+        omp + blk < omp 
+        avx_omp < omp
+        mpi_avx_fs < mpi omp
+
+        seq_blk_omp<mpi avx fs< mpi summa<mpi_omp<avx_omp<seq_omp
+
+    le meilleur combo est donc simplement le blocking avec open mp, 
+    et c'est agalement une des methode les plus facile a mattre en place.
+    

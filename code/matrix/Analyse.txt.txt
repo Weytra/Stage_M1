@@ -1,0 +1,67 @@
+Ce qui s'est avéré le plus utile : 1 - transposition, 2 - OpenMP, 3 - MPI, 4 - blocking, 5 - optimisation compilo, 6 - vectorisation
+
+Concernant le blocking, il s'est avéré très efficace pour les algos avec matrice non transposée, mais moins performant pour  
+les matrices transposées, ce qui s'explique par la localité du cache : elle est améliorée lors de matrices non transposées car  
+on évite les sauts de pages récurrents. Mais avec matrice transposée, on n’a plus ce problème de saut de pages dans l'ordre des calculs, donc  
+le blocking ajoute de la complexité et oblige à parcourir des morceaux de pages là où la transposition seule permet de parcourir toute la page, ou du moins toute la ligne d'un seul coup.
+
+Au vu de ces observations, il serait intéressant à présent de refaire des benchs avec les différents algos (surtout parallèle et OpenMP)  
+avec des matrices transposées.
+
+Analyse des versions TRANSPOSÉ jusqu’à 8192 :  
+SUMMA : la transposition permet de passer d'un temps d'exécution de 30-40 s à 3.6 s. Désormais le temps d'exécution de 8192 tr = 4096 non-tr.  
+Surprenant, mais apparemment pour de si grandes tailles, 4 processus est le plus rapide : 34 s vs 42 s avec 16 p.
+
+La puissance pour faire tourner les codes avec matrice transposée consomme beaucoup plus, allant de 15 W en non-transposé à 45 W avec tr.
+
+OpenMP est plus intéressant que MPI, avec un temps de 11.6 s en 8K contre 35 s en MPI.
+
+Le fait de vectoriser MPI n'apporte aucun gain de temps, on a même pour 8K un temps ex-aequo !  
+Preuve que l'auto-vectorisation par le compilateur est aussi performante qu'une vectorisation manuelle, donc cela ne sert pas de s’embêter à le faire nous-même.  
+La consommation énergétique est également identique, donc ma conclusion est que le compilateur fait les mêmes optimisations que ce que l'on peut faire à la main.  
+mpi_omp : la vectorisation, à nouveau, n’apporte rien.
+
+Ajouter OpenMP à MPI apporte des gains de temps : on passe de 34 s à 28 s, et la consommation d'énergie diminue de la même façon.
+
+Concernant les optimisations, O3 s'est montré ici très légèrement meilleur que Ofast sur mpi_omp_avx_blk.
+
+Cette fois, le blocking a apporté de gros gains de performance pour tous les programmes testés, c’est-à-dire en séquentiel et en mpi_omp_avx (O3 et Ofast).  
+On passe de 22 s (blk = 8) à 6.8 s (blk = 64).  
+Et évidemment la consommation énergétique se retrouve affectée : on a une différence de temps de ×3 et d'énergie de ×2.8, donc le même programme bloqué est bien plus rapide et économe en énergie !
+
+Pour la consommation énergétique de MPI, avec 4 proc on est à 1120 J contre 1500 J avec 16 proc, ce qui en plus est moins rapide (32 s vs 42 s).  
+Donc encore une fois : moins de temps = moins de consommation.
+
+Un code OpenMP (mise en place simple) permet de diviser par 5 (certains cas 8) le temps d'exécution par rapport à la version séquentielle sur laquelle il se base.  
+Le blocking sur un code OpenMP apporte des gains considérables.
+
+À présent, d’après les résultats sur une seule machine, l'ordre des gains apportés par les optimisations est :  
+et par rapport au temps de développement que ça rajoute, l'ordre est le suivant : transposition, OpenMP, blocking  
+gain de temps : (sur transposé)  
+ omp : 6  
+ blocking : 2-4  
+ mpi :  
+ transposition : ??? 6-8 ?  
+ optimisation compilo :
+
+La consommation énergétique est toujours très fortement corrélée au temps, en évoluant de la même façon.  
+On reste toujours dans le même ordre de grandeur : si on double le temps, on double la consommation.
+
+---
+
+analyse OpenMP avec matrice non transposée :  
+OpenMP réagit très bien au blocking ici, mais de préférence sur des petites tailles de block.  
+Apparemment la taille la plus rapide ici est 8, avec un temps de 0.6 s en 2048, contre 2.2 s avec block = 64, et sans blocking on est à 5 s.  
+Côté énergie, on est à 23 J pour blk = 8 contre 150 J sans blocking, donc pas ×10 comme le temps mais de l’ordre de grandeur malgré tout.  
+Ici, ajouter MPI à OpenMP semble apporter un gain mais de l'ordre de 20 % uniquement (ça passe de 4.8 s à 3.8 s).  
+Et donc logiquement, ajouter le blocking à OpenMP+MPI améliore le temps et l'énergie en passant à 0.75 s pour 38 J (vs 3.08 s pour 107 J).
+
+La puissance consommée semble être un bon indicateur de l'utilisation du CPU par rapport à la mémoire (power élevé = meilleure utilisation CPU).
+
+Donc ici : OPENMP = gros gain  
+Si on rajoute vectorisation : gain de 20 %  
+Blocking : à l’idéal divise par 8 le temps et l'énergie  
+Ajout de MPI : gain de 20 %  
+Ajout du blocking dans MPI : divise par 5 le temps et par 3 l'énergie  
+Mais le mieux est simplement OMP + blocking : 0.6 s / 23 J contre 0.75 s / 30 J pour omp + mpi + blocking + avx  
+rq : avx = avx512 = vectorisation

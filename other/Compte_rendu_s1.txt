@@ -1,0 +1,34 @@
+D'apres les premiers test que j'ai pu faire et les visualisation des diferentes
+données de temps d'execution obtenue grace à R_studio il apparait que les differentes 
+optimisation du compilateur (O0, O1, O2, O3, Ofast) aie un reel impact sur les temps
+d'execution, la methode la plus rapide sur les diferents algo de multiplication de matrice
+est sistematiquement l'optimisation O3, la O0 fluctue beaucoup mais est generalement la 
+pire, et le Ofast, contrairement a ce que son nom indique est plutot une mauvaisse 
+optimisation dans ce contexte.
+
+Concernant MPI, j'ai pu obtenir un speedup sur des grosse matrice allant jusqu'a ????
+avec 8 procesus sur une matrice de taille 4096
+
+j'ai constaté que des fonctions plus evolué de MPI ne sont pas forcement meilleur ce qui me 
+semble etonant et je vais donc creuser un peu plus cet aspect la afin de voir si c'estt lier
+a une erreur de mon code ou un reel probleme venant de MPI. 
+La fonction MPI_send_rcv_replace() est plus lente que de faire un send/recv manuelement en 
+deux operation distinct.
+De plus cette methode avec un send suivit d'un replace à la fin de chaque itération 
+est plus rapide que de "broadcaster" la matrice completes au debur du code parallele
+
+J'ai aussi consatter que le fait de faire du blocking sur un code parallélisé le rend 
+plus efficace, ce qui est logique mais qui méritais d'etre vérifier, cependant, en 
+parallele la taille des blocs semble ne pas avoir la meme incidence qu'en sequentielle.
+La ou en sequentielle la temps d'execution diminue en fonction de la taille du block
+jusqu'a la taille optimal avant de remonter lorsque le bloc devient trop gros, en MPI on a
+une diminution du temps moins significative, et le fait de mettre un bloc trop gros 
+n'affecte pas negativement le temps d'execution, peux etre que cela est du a diverse 
+optimisation de MPI, il faudras que je creuse plus en profondeur ce phénomène afin de 
+savoir a quoi il est du.
+
+
+Tache a effectuer par la suite :
+mesurer sur chaque programme le temps de calcul et le temps de comunication pour voir ou
+cela coince
+tester d'autre methode de paralelisation : cannon, fox

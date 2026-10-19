@@ -1,0 +1,110 @@
+Nous avons plusieurs version parallèle de multiplication de matrice avec les
+implementation suivante :
+
+FOX
+
+Type de décomposition :
+    Grille carrée de processus q×q.
+    Chaque processus (i,j) reçoit un bloc Aij et un bloc Bij
+
+
+Distribution initiale :
+
+    Découpage des matrices en blocs carrés de taille (N/q)×(N/q).
+    Chaque processus reçoit le bloc correspondant à sa position dans la grille.
+    Aucun décalage initial.
+
+Itération k :
+
+    Sur chaque ligne i, le processus (i,(i+k)modq) diffuse son bloc de A à tous les 
+    processus de la ligne. Tous les processus de la ligne utilisent ce bloc pour 
+    effectuer une multiplication locale. Chaque processus envoie ensuite son bloc 
+    de B au processus situé au-dessus et reçoit un nouveau bloc de B depuis le 
+    processus situé en dessous (rotation circulaire sur les colonnes).
+
+Communications par itération :
+
+    1 broadcast par ligne.
+    1 rotation verticale des blocs de B.
+
+/!\ Difference entre fox_2 et fox_3 :
+Fox_2 : Utilise ma propre implementation de la grille sur la base d'un compostion 
+    des fonctions elementaire,
+Fox 3 : Utilise la topologie de grille proposé dans le module MPI, cela permet de faciliter
+    les communications, a condition de bien comprendre comment utiliser ces fonctions. 
+
+
+
+
+CANNON :
+
+Type de décomposition :
+    Grille carrée de processus q×q.
+    Chaque processus (i,j) reçoit un bloc Aij et un bloc Bij
+
+
+Distribution initiale :
+
+Découpage des matrices en blocs carrés.
+    Décalage initial de A :
+    chaque bloc Aij est déplacé de i positions vers la gauche.
+
+Décalage initial de B :
+    chaque bloc Bij est déplacé de j positions vers le haut.
+
+Itération k :
+
+Chaque processus multiplie ses blocs locaux.
+Chaque processus envoie son bloc de A au voisin de gauche et reçoit un nouveau bloc depuis le voisin de droite.
+Chaque processus envoie son bloc de B au voisin du haut et reçoit un nouveau bloc depuis le voisin du bas.
+
+Communications par itération :
+
+    1 rotation horizontale de A.
+    1 rotation verticale de B.
+    Aucun broadcast.
+
+
+
+SUMMA
+
+Type de décomposition :
+    Grille carrée de processus q×q.
+    Chaque processus (i,j) reçoit un bloc Aij et un bloc Bij
+
+Distribution initiale :
+    Découpage des matrices en blocs carrés.
+    Aucun décalage initial.
+
+Itération k :
+    Le processus (i,k) diffuse son bloc Aik à tous les processus de sa ligne.
+    Le processus (k,j) diffuse son bloc Bkj a tous les processus de sa colonne.
+    Chaque processus utilise les blocs reçus pour calculer une contribution à son 
+    bloc résultat Cij
+
+
+Communications par itération :
+
+    1 broadcast sur chaque ligne.
+    1 broadcast sur chaque colonne.
+    Aucun déplacement permanent des blocs.
+
+
+Mult mat paral blk:
+
+Decomposition :
+    Ligne de processus
+    Chaque processus gere un bloc de n lignes de la matrice A
+    Chaque processus gere un bloc de n lignes de la matrice Bt (B transposé)
+    Avec n = size/nb_proc
+
+/!\ cette utilisation de matrice transposé pour faciliter la comunication a un fort impact.
+
+Distribution initial:
+    Chaque procesus Pi recoit le bloc de lignes Ai et Bi
+    Aucun decalage initial
+
+Itération k:
+    Les procesus calcule le produit de leur matrice avec les deux bloc de donnees
+    qu'ils ont a leur disposition
+    chaque procesus envoie son bloc de A et de B a son voisin de droite (my_rank + 1)%comm_size

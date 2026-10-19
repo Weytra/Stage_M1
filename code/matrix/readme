@@ -1,0 +1,45 @@
+Ce dossier fonctionne de la sorte : 
+les fichier sources C sont disposé dans le dossier code/src/
+séparer en plusieurs parties, une pour les version sequentielles, 
+une autre pour les version parallèle, et un autre dossier avec les include 
+qui servent de boite a outils pour les autres codes.
+
+les binnaires sont disposé dans code/bin, repartie de facon ordonné
+similaire a la section src avec en plus divers binaires en fonction des
+niveau d'optimisation lors de la compilation
+
+ces binaires sont gerer par le makefile present a la racine du dossier
+qui possede plusieurs commande et permet de lancer des test de performance
+sur tout les code actuelement present dans la partie src
+cette derniere option n'est peux etre pas encore parfaitement compatible
+avec la multiplication parallèle de fox car j'ai legeremetn revu mon
+arborescence et tout n'est peut etre pas encore parfaitement rectifié
+
+pour lancer les test il faut donc utiliser le makefile et lancer les
+commandes suivante qui aurront pour but de:
+    1) compiler tout les programmes sous les diverse methode d'optimisation
+            disponible (O0-0fast)
+    2) lancer l'execution de ces diverse binaires avec different parametre
+            tel que la taille des matrice ainsi que le nombre de processus mpi
+            qui serront lancer
+            Une moyenne est faite sur l'execution de 10 fois chaque 
+            programme pour avoir une estimation de temps plus précise
+    3) recupération des donne de temps d'execution de chaque programme 
+            et ecriture de toutes ces donnes dans un dossier corespondant 
+            a chaque programme lancer, dans le dossier resultats.
+            un fichier contenant les temps de toute les execution est
+            present a la racine de ce dossier resultat.
+
+Commande a executer afin d'obtenir ces resultat : 
+
+make
+make run_all
+make global_results
+
+Les autres benchmark independant isolé sont dans les dossiers bench present dans ce dossier
+
+Les vectorisation automatique du compilo ne sont pas exprimer dans les benchmark car pour les obtenir il suffit de changer les flag de compilation.
+Afin de les tester il suffit d'ajouter les flags : 
+        -ftree-vectorize pour forcer le compilateur a vectorize le plus de chose possible
+        -fno-tree-vectorize pour l'empecher de vectoriser
+        ne rien mettre pour le laisser decider par lui même

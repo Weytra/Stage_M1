@@ -1,0 +1,262 @@
+.
+├── arbre.txt
+├── blocking
+│   ├── Rplot.png
+│   ├── Rplot01.pdf
+│   ├── Rplot02.png
+│   └── results.csv
+├── parallele
+│   ├── SUMMA_
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── SUMMA_vect
+│   │   ├── O1
+│   │   ├── O2
+│   │   ├── O3
+│   │   └── Ofast
+│   ├── cannon_2
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── fox_2
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── fox_3
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── fox_cop
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── mlt_mat_prl_blk
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── mlt_prl_fox_2
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── mult_bcast
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── mult_bcast_blk
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── mult_mat_paral
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   ├── mult_send_rcv_replace
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── Ofast
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── resultat_global.csv
+│   └── resultat_global.csv
+├── seq
+│   ├── mult_mat_seq
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   ├── O3
+│   │   └── Ofast
+│   ├── mult_mat_seq_blocking
+│   │   ├── O0
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── Ofast
+│   │       ├── result.csv
+│   │       └── result.txt
+│   ├── mult_mat_seq_vecto
+│   │   ├── O0
+│   │   ├── O1
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O2
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   ├── O3
+│   │   │   ├── result.csv
+│   │   │   └── result.txt
+│   │   └── Ofast
+│   │       ├── result.csv
+│   │       └── result.txt
+│   └── mult_mat_seq_vecto_tr
+│       ├── O0
+│       ├── O1
+│       │   ├── result.csv
+│       │   └── result.txt
+│       ├── O2
+│       │   ├── result.csv
+│       │   └── result.txt
+│       ├── O3
+│       │   ├── result.csv
+│       │   └── result.txt
+│       └── Ofast
+│           ├── result.csv
+│           └── result.txt
+├── seq_calsique
+│   ├── result.csv
+│   └── results.txt
+└── visualisation_donnee.R
+
+100 directories, 160 files

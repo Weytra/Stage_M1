@@ -1,0 +1,12 @@
+on a pas ouvers l'energie
+blk = 0
+size = 512
+on a pas ouvers l'energie
+on a pas ouvers l'energie
+on a pas ouvers l'energie
+GLOBAL_TIME=0.295504
+GLOBAL_ENERGY=0.000000000000
+GLOBAL_POWER=0.000000
+ALGO_TIME=0.292776
+ALGO_ENERGY=0.000000000000
+ALGO_POWER=0.000000

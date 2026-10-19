@@ -1,0 +1,1216 @@
+---
+title: "Rapport SEIR"
+author: "GUILHEM"
+date: "2026-06-27"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(plotly)
+library(dplyr)
+library(knitr)
+library(readr)
+plot_auto <- function(p) {
+  if (knitr::is_html_output()) {
+    ggplotly(p, tooltip = "text")
+  } else {
+    p
+  }
+}
+
+```
+Le modèle SEIR répartit la population en quatre états (S, E, I, R) et simule l’évolution d’une épidémie selon la dynamique S→E→I→R. Dans notre implémentation, la population est représentée sur une grille où les individus se déplacent localement à chaque itération, ce qui facilite l’usage de différents paradigmes (séquentiel, OpenMP, MPI, hybride).
+Le modèle dépend de trois paramètres : la taille de la grille, le nombre d’individus et le pourcentage initial d’infectés.
+
+Toutes les versions reposent sur la même logique : déplacement des individus, mise à jour synchronisée de l’état via deux grilles (propagation locale de l’infection). Les différences portent uniquement sur la manière d’exploiter le parallélisme :
+
+Séquentiel : parcours naïf de la grille, sans parallélisme.
+
+OpenMP : V1: parallèlise les deux phases de chaque itération (cause beaucoup de dépendance), V2 paralélise uniquement la partie de mise à jour des états.
+
+MPI : découpage de la grille en sous‑domaines avec échanges de bordures.
+
+Ce rapport analyse l’impact des optimisations du compilateur, de la vectorisation, de la taille des structures mémoire et compare les performances des quatre paradigmes.
+Maintenant que le cadre est posé nous pouvons à présent commencer l'analyse, regardons tout d'abord l'effet des optimisations O0 - Ofast du compilateur sur la version séquentielle:
+
+# Analyse de l'algorithme sequentiel
+
+## Analyse des optimisations
+
+```{r, echo=FALSE}
+Bench_2 <- read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/SEIR/results/SEIR/results/infect_seq.csv")
+
+
+Mean_res = Bench_2 %>% group_by(exec,opt,nb_indiv,size,pct_infect) %>%
+  summarise(G_time = mean(GT),G_energie= mean(GE),G_power = mean(GP),A_time = mean(AT),A_energie = mean(AE),A_power = mean(AP),.groups =  "drop");
+
+### temps algo
+  p <- Mean_res %>% 
+    filter(pct_infect == 30) %>% 
+    ggplot(aes(
+      x = size,
+      y = A_time,
+      color = factor(opt),
+      group = opt,
+      text = paste(
+        "Algo :", exec,
+        "<br>opt :", opt,
+        "<br>size :", size,
+        "<br>% infectés :", pct_infect,
+        "<br>Temps :", round(A_time, 3), "s",
+        "<br>Énergie :", round(A_energie, 3), "J",
+        "<br>Power :", round(A_power, 3)
+      )
+    )) +
+    facet_wrap(~ nb_indiv) +
+    geom_line() +
+    geom_point() +
+    labs(color = "OPT",title = "Incidence des optimisations de compilation") +
+    theme_minimal()
+  
+  plot_auto(p)
+
+```
+Les différentes optimisations du compilateur présentent des performances globalement similaires, à l’exception notable du niveau O0, nettement en retrait et pouvant être jusqu’à deux fois plus lent que les meilleures configurations. Les niveaux O3 et Ofast offrent les meilleurs résultats et restent très proches en termes de rapidité, mais O3 se distingue par une meilleure stabilité.
+Pour la suite des benchmarks, nous retenons donc O3 comme optimisation de référence.
+
+## Incidence du pourcentage d'individus infecté (cf annexe : SEIR_A):
+
+Le pourcentage initial d’infectés n’a aucun impact sur les performances : le coût de calcul dépend du nombre total d’individus, indépendamment de leur état.
+
+
+## Comparaison des differentes vectorisations possibles
+
+```{r, echo=FALSE}
+Mean_res <- read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/SEIR/results/seq_global_2.csv")
+
+Mean_res_plot <- Mean_res %>%
+  filter(nb_indiv < 80000) %>% 
+  filter(pct_infect == 30) %>% 
+  filter(size < 1200) %>% 
+  filter(exec %in% c("seq_vect","seq_A_vect_forced","seq_nv")) %>% 
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- Mean_res_plot %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = tooltip
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+
+  labs(color = "Nombre d'individus",title="Effet des vectorisations en séquentielle")
+plot_auto(p)
+
+
+#calcul du tableau de ratio time et energy
+ref_algo <- "seq_vect"
+
+# On extrait uniquement les lignes de référence
+ref_df <- Mean_res %>%
+  filter(exec == ref_algo) %>%
+  select(size, nb_indiv, pct_infect, 
+         ref_time = A_time,
+         ref_energy = A_energie)
+
+# On join sur toutes les autres versions
+ratio_df <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(exec %in% c("seq_A_vect_forced","seq_nv","seq_vect")) %>% 
+  left_join(ref_df, 
+            by = c("size", "nb_indiv", "pct_infect")) %>%
+  mutate(
+    speedup = ref_time / A_time,
+    energy_ratio = A_energie/ref_energy 
+  )
+
+
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios par algorithme")
+
+
+```
+
+Toutes les versions sont compilées en O3.
+La version seq_vect correspond au comportement par défaut : le compilateur vectorise automatiquement lorsque c’est possible.
+La version seq_nv est compilée avec -fno-tree-vectorize, ce qui désactive toute vectorisation.
+Enfin, la version seq_A_vect_forced utilise -ftree-vectorize, qui pousse le compilateur à vectoriser de manière agressive.
+
+Les graphiques montrent le temps d’exécution en haut et la consommation énergétique en bas. Deux résultats importants se dégagent.
+
+1. Temps d’exécution : 
+Les différences entre les versions restent modestes, de l’ordre de 10 %.
+La version non vectorisée est légèrement plus rapide, tandis que la vectorisation forcée est un peu plus lente.
+Pour ce modèle SEIR, cela indique que la vectorisation n’améliore pas la vitesse, et peut même introduire une petite pénalité.
+
+2. Consommation énergétique :
+La tendance est inverse :
+la version à vectorisation forcée est nettement plus économe, avec un gain d’environ 38 % par rapport à la version par défaut.
+Autrement dit, même si elle est un peu plus lente, elle consomme beaucoup moins d’énergie.
+
+3. Analyse des ratios : 
+Le tableau des ratios confirme ces observations :
+la vectorisation forcée est environ 20 % plus lente, mais 40 % plus économe.
+Le gain énergétique compense largement la perte de performance.
+La version non vectorisée montre une tendance similaire, mais beaucoup plus faible, et les écarts restent dans la marge d’erreur.
+
+## Différences liées à la taille des structures utilisées.
+
+```{r, echo=FALSE}
+
+
+Mean_res_plot <- Mean_res %>%
+  filter(nb_indiv < 80000) %>% 
+  filter(pct_infect == 30) %>% 
+  filter(size < 1200) %>% 
+  filter(exec %in% c("seq_C_NO_friendly","seq_C_friendly")) %>% 
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- Mean_res_plot %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = tooltip
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+labs(color= "Nombre d'individus",title = "Incidence de la taille des structures en séquentielle")
+
+plot_auto(p)
+
+#calcul du tableau de ratio time et energy
+ref_algo <- "seq_C_friendly"
+
+# On extrait uniquement les lignes de référence
+ref_df <- Mean_res %>%
+  filter(exec == ref_algo) %>%
+  select(size, nb_indiv, pct_infect, 
+         ref_time = A_time,
+         ref_energy = A_energie)
+
+# On join sur toutes les autres versions
+ratio_df <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(exec %in% c("seq_C_NO_friendly","seq_C_friendly")) %>% 
+  left_join(ref_df, 
+            by = c("size", "nb_indiv", "pct_infect")) %>%
+  mutate(
+    speedup = ref_time / A_time,
+    energy_ratio = A_energie/ref_energy 
+  )
+
+
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios par algorithme")
+
+
+
+
+
+
+```
+
+La réduction de la taille des structures améliore logiquement le temps d’exécution, mais s’accompagne d’une légère hausse de la consommation d’énergie, ce qui peut sembler contre‑intuitif. Les ratios montrent que la version NO_friendly est environ 11 % plus lente, pour seulement ~7 % d’économie d’énergie, alors que les deux variantes ne diffèrent que d’environ 20 % en taille de structure.
+
+Ces résultats indiquent que la consommation d’énergie est peu sensible à la taille des structures : réduire la structure n’abaisse presque pas l’énergie consommée, mais améliore le temps d’exécution de manière proportionnelle (environ la moitié du gain lié à la réduction de taille).
+Dans ces conditions, la variante plus volumineuse n’apporte aucun avantage réel : elle augmente la pression mémoire et pourrait même entraîner un coût énergétique global plus élevé dans des scénarios plus complexes, ce qui annulerait le faible gain observé.
+
+
+# Analyse des versions MPI:
+
+## Analyse de la taille des structures :
+
+```{r, echo=FALSE}
+
+Mean_res <- read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/SEIR/results/mpi_global_2.csv")
+
+Mean_res_plot <- Mean_res %>%
+  filter(np==16) %>% 
+  filter(nb_indiv < 80000) %>% 
+  filter(pct_infect == 30) %>% 
+  filter(size < 1200) %>% 
+  filter(exec %in% c("mpi_C_friendly","mpi_C_NO_friendly")) %>% 
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>np :", np,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- Mean_res_plot %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = tooltip
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+
+  labs(color= "Nombre d'individus",title = "Incidence de la taille des structures en MPI")
+
+plot_auto(p)
+
+
+#calcul du tableau de ratio time et energy
+ref_algo <- "mpi_C_friendly"
+
+# On extrait uniquement les lignes de référence
+ref_df <- Mean_res %>%
+  filter(exec == ref_algo) %>%
+  select(size, nb_indiv, pct_infect,np ,
+         ref_time = A_time,
+         ref_energy = A_energie)
+
+# On join sur toutes les autres versions
+ratio_df <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(exec %in% c("mpi_C_NO_friendly","mpi_C_friendly")) %>% 
+  left_join(ref_df, 
+            by = c("size", "nb_indiv", "pct_infect","np")) %>%
+  mutate(
+    speedup = ref_time / A_time,
+    energy_ratio = A_energie/ref_energy 
+  )
+
+
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios par algorithme")
+
+
+
+
+```
+Dans la version MPI, la taille des structures ne semble avoir aucun impact significatif ni sur le temps d’exécution, ni sur la consommation d’énergie. Les légères différences observées, généralement à l’avantage de la version cache_friendly, restent clairement dans la marge d’erreur.
+
+Cela s’explique par le fait que, dans MPI, le coût dominant provient du découpage de la grille, des communications entre processus et de la synchronisation des bordures. Ces opérations masquent largement les effets liés à la taille des structures internes. Ainsi, contrairement à la version séquentielle, la pression mémoire locale joue un rôle très limité dans les performances globales du modèle.
+
+## Importance des optimisations en MPI :
+
+```{r, echo=FALSE}
+
+
+### temps algo
+p <- Mean_res %>% 
+  filter(exec == "mpi") %>% 
+  filter(pct_infect == 30) %>% 
+  filter(np == 8) %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(opt),
+    group = opt,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ nb_indiv) +
+  geom_line() +
+  geom_point() +
+  labs(color = "OPT") +
+  theme_minimal()+labs(color= "Taille",title = "Incidence des optimisations en MPI celon le nombre d'individus")
+
+plot_auto(p)
+
+###ggplotly(p)
+
+
+```
+Optimisations du compilateur en MPI
+Les résultats sont un peu moins tranchés que pour la version séquentielle, mais la tendance générale reste la même. Le niveau O0 est clairement en retrait, tandis que O3 offre globalement les meilleures performances. Les autres niveaux d’optimisation se situent entre les deux, sans différence marquée.
+
+Ainsi, même en MPI — où le coût des communications domine souvent le temps de calcul — O3 demeure l’option la plus efficace, confirmant son statut d’optimisation de référence pour la suite des benchmarks.
+Regardon à present la scalabilité du probleme avec l'utilisation de MPI
+
+## Scalabilité en MPI :
+
+```{r, echo=FALSE}
+
+### temps algo
+p <- Mean_res %>% 
+  filter(pct_infect == 30) %>% 
+  filter(opt=="O3") %>% 
+  filter(exec == "mpi") %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(np),
+    group = np,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ nb_indiv) +
+  geom_line() +
+  geom_point() +
+  labs(color = "Taille (size)") +
+  theme_minimal()+labs(color= "Taille",title = "Scalabilité en MPI")
+
+plot_auto(p)
+
+
+```
+On observe qu’il existe un nombre optimal de processus à ne pas dépasser. La scalabilité est bonne jusqu’à 12 processus, mais passer à 16 dégrade nettement le temps d’exécution. La consommation d’énergie suit exactement la même tendance : le point optimal est également atteint à 12 processus, à la fois en performance et en efficacité énergétique.
+
+Il est également notable que, pour certaines tailles de problème très petites, il peut être préférable d’utiliser 8, voire 4 processus, car au‑delà, le coût de communication devient dominant et annule les bénéfices du parallélisme.
+
+## Vectorisation en MPI
+
+```{r, echo=FALSE}
+Mean_res_mpi_plot <- Mean_res %>%
+  filter(exec %in% c("mpi_nv","mpi_vect","mpi_base")) %>%
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>np :", np,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- Mean_res_mpi_plot %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = factor(nb_indiv),
+    group = interaction(nb_indiv, np),
+    text = tooltip
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(color = "nb_indiv",title = "Incidence de la vectorisation en MPI")
+plot_auto(p)
+
+
+
+ref_algo <- "mpi_base"
+
+ref_df <- Mean_res %>%
+  filter(exec == ref_algo) %>%
+  select(size, nb_indiv, pct_infect, np,
+         ref_time = A_time,
+         ref_energy = A_energie)
+
+ratio_df <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(exec %in% c("mpi_nv","mpi_vect","mpi_base")) %>%
+  left_join(ref_df,
+            by = c("size", "nb_indiv", "pct_infect", "np")) %>%
+  mutate(
+    speedup = ref_time / A_time,          # >1 = plus rapide que friendly
+    energy_ratio = A_energie / ref_energy # <1 = plus économe que friendly
+  )
+
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios MPI (vect vs no_vect vs basique)")
+
+
+
+```
+
+Dans la version MPI, les écarts entre les différentes configurations de vectorisation sont beaucoup plus faibles que dans la version séquentielle. On retrouve globalement la même tendance — la vectorisation forcée apporte un léger avantage énergétique et une petite pénalité en temps — mais les différences sont ici très réduites.
+
+Étant donné la rapidité d’exécution des programmes MPI et le poids dominant des communications et de la synchronisation dans le coût total, ces variations se situent à la limite de la marge d’erreur. Autrement dit, sous MPI, la vectorisation a un impact bien moindre que dans le séquentiel, et son effet devient presque négligeable.
+
+# Analyse des algorithmes OpenMP :
+
+```{r, include=FALSE, results='hide'}
+
+Mean_res <- read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/SEIR/results/omp_global_2.csv")
+
+
+
+### temps algo
+p <- Mean_res %>% 
+  filter(pct_infect == 30) %>% 
+  filter(exec =="omp") %>%
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(opt),
+    group = opt,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ nb_indiv) +
+  geom_line() +
+  geom_point() +
+  labs(color = "Taille (size)") +
+  theme_minimal()+labs(color= "Taille",title = "Incidence de l'optimisation en OpenMP")
+
+plot_auto(p)
+
+
+```
+Concernant l’impact des optimisations du compilateur, on retrouve exactement les mêmes tendances que pour les versions MPI et séquentielles. Le niveau O0 reste nettement en retrait, tandis que O3 fournit systématiquement les meilleures performances et la meilleure stabilité.
+
+Les résultats étant parfaitement cohérents avec les analyses précédentes et ne montrant aucune information nouvelle, nous ne présentons pas ici les graphiques correspondants.
+
+## Taille des structures
+
+```{r, echo=FALSE}
+
+Mean_res_plot <- Mean_res %>%
+  filter(nb_indiv < 80000) %>% 
+  filter(pct_infect == 30) %>% 
+  filter(size < 1200) %>% 
+  filter(exec %in% c("omp_friendly","omp_no_friendly")) %>% 
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+#Mean_res_plot %>% count(metric, exec)
+
+p <- Mean_res_plot %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = tooltip
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+
+  labs(color= "Nombre d'individus",title = "Incidence de la taille des structures pour OpenMP")
+
+#print(p)
+plot_auto(p)
+
+
+#calcul du tableau de ratio time et energy
+ref_algo <- "omp_friendly"
+
+# On extrait uniquement les lignes de référence
+ref_df <- Mean_res %>%
+  filter(exec == ref_algo) %>%
+  select(size, nb_indiv, pct_infect, 
+         ref_time = A_time,
+         ref_energy = A_energie)
+
+# On join sur toutes les autres versions
+ratio_df <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(exec %in% c("omp_friendly","omp_no_friendly")) %>% 
+  left_join(ref_df, 
+            by = c("size", "nb_indiv", "pct_infect")) %>%
+  mutate(
+    speedup = ref_time / A_time,
+    energy_ratio = A_energie/ref_energy 
+  )
+
+
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios par algorithme")
+
+
+```
+Pour OpenMP, nous ne constatons aucune différence notable entre les différentes tailles de structures. Les temps d’exécution comme la consommation d’énergie restent pratiquement identiques, et les écarts observés se situent clairement dans la marge d’erreur.
+
+Cela confirme que, dans OpenMP, la taille des structures a un impact négligeable : le coût dominant provient de la gestion du parallélisme (synchronisation, répartition des tâches), ce qui masque les effets liés à la pression mémoire.
+
+## Différences entre les deux versions OpenMp
+
+```{r, echo=FALSE}
+Mean_res_plot <- Mean_res %>%
+  filter(pct_infect == 30) %>% 
+  filter(opt == "O3") %>% 
+  filter(size < 1200) %>% 
+  filter(exec %in% c("omp","omp_v2")) %>% 
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectes :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>energie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- Mean_res_plot %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = tooltip
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+labs(color= "Nombre d'individus",title ="Comparaison des versions OpenMP")
+
+plot_auto(p)
+
+
+#calcul du tableau de ratio time et energy
+ref_algo <- "omp"
+
+# On extrait uniquement les lignes de référence
+ref_df <- Mean_res %>%
+  filter(exec == ref_algo) %>%
+  filter(pct_infect == 30) %>%
+  filter(opt == "O3") %>%
+  select(size, nb_indiv,
+         ref_time = A_time,
+         ref_energy = A_energie)
+
+# On join sur toutes les autres versions
+ratio_df <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(opt=="O3") %>%
+  filter(exec %in% c("omp","omp_v2")) %>%
+  left_join(ref_df,
+            by = c("size", "nb_indiv")) %>%
+  mutate(
+    speedup = ref_time / A_time,
+    energy_ratio = A_energie/ref_energy
+  )
+
+
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios par algorithme")
+
+
+```
+On voit très clairement que la version qui force la parallélisation (OMP V1) est vraiment très mauvaise par rapport à la version 2 (OMP V2), qui ne parallélise que ce qu’elle peut sans introduire de dépendances. Le coût de calcul est nettement plus faible dans OMP V2, et la consommation énergétique est réduite dans les mêmes proportions.
+
+Ici, les ratios sont particulièrement marquants :
+un speed‑up d’environ ×6 entre V1 et V2,
+une consommation énergétique divisée par ~7.
+
+La version OMP V1 est donc à oublier, tout simplement.
+
+On voit qu’il est tentant de vouloir paralléliser un maximum de choses, mais dans ce cas précis, tout ce qui est mis en place dans V1 pour permettre à OpenMP de paralléliser (notamment l’enchaînement de malloc/free pour isoler les données entre threads) introduit une surcharge énorme. Cela ne permet absolument pas d’augmenter la vitesse d’exécution — au contraire, cela la dégrade fortement.
+
+Cette chute de performance dans OMP V1 est probablement liée au fait que les allocations mémoire (malloc/free) ne sont pas parallélisables : elles passent toutes par un allocateur global protégé par un verrou. Les threads OpenMP doivent donc attendre les uns après les autres, ce qui annule totalement le bénéfice du parallélisme et introduit une surcharge massive. Cela explique pourquoi OMP V1 est beaucoup plus lente et plus énergivore que OMP V2.
+
+# Analyse des l'algorithmes hybrid (MPI+OpenMP)
+
+## Comapraison des deux algorithme hybrid
+
+```{r, echo=FALSE}
+
+Mean_res <- read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/SEIR/results/hybrid_global_2.csv")
+
+
+Mean_res_plot <- Mean_res %>%
+  filter(omp_threads == 4) %>% 
+  filter(np == 4) %>% 
+  filter(size <=800) %>% 
+  filter(nb_indiv<40000) %>% 
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>np :", np,
+      "<br>omp th :", omp_threads,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- Mean_res_plot %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = tooltip
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+labs(color= "Nombre d'individus",title = "Difference entre les versions Hybrids")
+
+plot_auto(p)
+
+
+#calcul du tableau de ratio time et energy
+ref_algo <- "hybrid"
+
+ref_df <- Mean_res %>%
+  filter(exec == ref_algo) %>%   
+  filter(omp_threads == 4) %>% 
+  filter(np == 4) %>% 
+  filter(size <= 800) %>% 
+  filter(nb_indiv < 40000) %>% 
+  select(size, nb_indiv, np, omp_threads,
+         ref_time = A_time,
+         ref_energy = A_energie)
+
+ratio_df <- Mean_res %>%
+  filter(omp_threads == 4) %>% 
+  filter(np == 4) %>% 
+  filter(size <= 800) %>% 
+  filter(nb_indiv < 40000) %>% 
+  left_join(ref_df,
+            by = c("size", "nb_indiv", "np", "omp_threads")) %>%
+  mutate(
+    speedup = ref_time / A_time,
+    energy_ratio = A_energie / ref_energy
+  )
+
+
+
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios par algorithme")
+
+
+
+
+```
+Les résultats mettent en évidence deux comportements intéressants. La version hybrid_2, basée sur omp_v2, est nettement plus rapide, avec un speedup d’environ 2,5. En revanche, elle consomme environ 64 % d’énergie de plus que la version hybride classique. Cette différence s’explique par le fait que la V2 passe beaucoup moins de temps en attente et parvient à paralléliser efficacement les sections utiles, ce qui active davantage les unités vectorielles (AVX). Or, même lorsque les registres SIMD ne sont pas entièrement remplis — ce qui peut arriver avec des tailles de données modestes — l’unité AVX consomme autant d’énergie tout en produisant moins de résultats par instruction. La V2 sollicite donc le CPU de manière plus intensive, ce qui augmente sa consommation totale malgré un temps d’exécution réduit.
+
+En pratique, la V2 offre un meilleur compromis temps d’exécution / énergie, mais dans des contextes où la priorité est la sobriété énergétique, la V1 peut rester pertinente.
+
+Il faut toutefois ajouter une nuance importante : les mesures énergétiques reposent sur RAPL, qui ne comptabilise essentiellement que l’énergie du CPU. Les coûts liés à la mémoire ne sont pas tous intégrés. Or, la version V1 effectue de très nombreux malloc/free, ce qui augmente la pression mémoire et devrait, en réalité, pénaliser davantage sa consommation totale. Ainsi, la différence énergétique observée en faveur de la V1 est probablement sous‑estimée, car une partie de son coût réel n’est pas mesurée.
+
+## Scalabilité de la version hybrid
+
+```{r, echo=FALSE}
+Mean_res_plot <- Mean_res %>%
+  filter(exec == "hybrid_2") %>% 
+  filter(nb_indiv==20000) %>% 
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>np :", np,
+      "<br>omp th :", omp_threads,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- Mean_res_plot %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = interaction(np,omp_threads,sep="_"),
+    group = interaction(np, omp_threads),
+    text = tooltip
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+labs(color= "NP_THREADS",title = "Scalabilité de la version Hybrid")
+
+plot_auto(p)
+###ggplotly(p)
+
+```
+On observe que pour la version hybrid_v2, le temps d’exécution est très fortement corrélé à l’énergie consommée. La meilleure configuration est clairement 8 processus MPI / 2 threads OpenMP, qui produit simultanément les courbes les plus basses en temps et en énergie.
+
+Avec np = 4, on voit que pour les deux plus petites tailles, il reste intéressant de conserver omp = 2, mais à partir de size = 800, il devient préférable d’augmenter le nombre de threads OpenMP : le temps diminue, et comme le temps est presque parfaitement corrélé à l’énergie dans cet échantillon, la consommation énergétique diminue également.
+
+On observe également un point intéressant : lors d’un lancement involontaire avec np = 16 et omp = 2, soit 32 processus au total alors que la machine utilisée n'en posède que 16, donc deux fois plus que le nombre de cœurs physiques disponibles, les performances ne s’effondrent pas complètement. Cette configuration reste légèrement moins bonne que le couple optimal 8 MPI / 2 OMP, mais l’écart reste étonnamment faible. Cela montre que, dans ce modèle, l’oversubscription ne pénalise pas autant qu’on pourrait l’attendre, probablement parce que les sections parallèles sont suffisamment courtes pour que la surcharge de scheduling reste contenue.
+
+À noter que la version hybrid_v1 montre exactement la même tendance, avec les mêmes con
+
+# ANALLYSE GLOBALE DES RESULTATS
+
+
+```{r, echo=FALSE}
+
+Mean_res <- read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/SEIR/results/infect_4_final.csv")
+
+p <- Mean_res %>%
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(nb_indiv),
+    group = interaction(nb_indiv, np, omp_threads),
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>omp : ",omp_threads,
+      "<br>np :",np,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+labs(color= "Nombre d'individus",title = "Comparaison des différents paradigme (Temps d'exec)")
+
+
+q <- Mean_res %>%
+  ggplot(aes(
+    x = size,
+    y = A_energie,
+    color = factor(nb_indiv),
+    group = interaction(nb_indiv, np, omp_threads),
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>omp : ",omp_threads,
+      "<br>np :",np,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+labs(color= "Nombre d'individus",title = "Comparaison des différents paradigme (Energie)")
+
+
+plot_auto(p)
+plot_auto(q)
+
+
+
+
+ref_algo <- "seq_ult"
+
+ref_df <- Mean_res %>%
+  filter(exec == ref_algo) %>%
+  filter(size > 200) %>% 
+  select(size, nb_indiv, 
+         ref_time = A_time,
+         ref_energy = A_energie)
+
+ratio_df <- Mean_res %>%
+  filter(size >200) %>% 
+  left_join(ref_df,
+            by = c("size", "nb_indiv")) %>%
+  mutate(
+    speedup = ref_time / A_time,
+    energy_ratio = A_energie / ref_energy
+  )
+
+
+
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios par algorithme")
+
+```
+On peut maintenant comparer les quatre versions principales.
+En observant d’abord l’énergie, on remarque que les deux versions utilisant MPI sont très proches l’une de l’autre, tout comme la version séquentielle et la version OpenMP, qui présentent des courbes quasiment identiques. Entre ces deux groupes, l’écart peut atteindre un facteur 2 (par exemple 52 J contre 113 J), ce qui représente un gain énergétique très significatif.
+
+En examinant ensuite le temps d’exécution, on retrouve exactement la même séparation en deux groupes. Cette fois, l’écart est encore plus marqué : les versions basées sur MPI atteignent un speedup d’environ 4 dans leur configuration optimale, c’est‑à‑dire lorsque les 16 cœurs sont pleinement exploités.
+
+L’analyse moyenne confirme ces observations : la méthode OpenMP n’apporte pratiquement aucun bénéfice par rapport à la version séquentielle. En revanche, la version MPI offre un gain très net, à la fois en temps et en énergie, avec un speedup supérieur à 5 et une consommation énergétique réduite d’environ 44 %. Pour ce problème, la méthode MPI apparaît donc clairement comme la version la plus performante et la plus efficace énergétiquement.
+
+
+
+```{r, echo=FALSE}
+best_configs <- Mean_res %>%
+  filter(size > 200) %>% 
+  group_by(exec, size, nb_indiv) %>% 
+  slice_min(A_time, n = 1) %>% 
+  ungroup()
+
+ref_algo <- "seq_ult"
+
+ref_df <- best_configs %>%
+  filter(exec == ref_algo) %>%
+  select(size, nb_indiv,
+         ref_time = A_time,
+         ref_energy = A_energie)
+ratio_df <- best_configs %>%
+  left_join(ref_df, by = c("size", "nb_indiv")) %>%
+  filter(!is.na(ref_time)) %>% 
+  mutate(
+    speedup = ref_time / A_time,
+    energy_ratio = A_energie / ref_energy
+  )
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios par algorithme (config optimale)")
+
+```
+
+# Conclusion finale du modèle SEIR
+
+L’ensemble des expérimentations montre que le modèle SEIR se prête très bien au parallélisme inter‑processus (MPI), mais très mal au parallélisme intra‑nœud (OpenMP) et à la vectorisation. Les dépendances locales, les accès mémoire irréguliers et la structure même du modèle limitent fortement les gains possibles via les optimisations classiques.
+
+Les optimisations du compilateur confirment rapidement leurs limites : O3 s’impose systématiquement comme le meilleur compromis, tandis que O0 dégrade fortement les performances. La vectorisation automatique n’apporte qu’un bénéfice marginal, et la vectorisation forcée, bien que parfois plus sobre énergétiquement, reste légèrement plus lente. De manière générale, la vectorisation n’est pas un levier déterminant pour ce modèle.
+
+Les optimisations liées à la taille des structures produisent des effets modestes : la version cache‑friendly réduit légèrement le temps d’exécution, mais l’impact énergétique reste faible et souvent noyé dans la variabilité des mesures. Le modèle SEIR n’est donc pas particulièrement sensible à la localité mémoire.
+
+Les approches OpenMP confirment cette tendance : la version naïve souffre de synchronisations et d’allocations excessives, tandis que la version propre (omp_v2) reste limitée par les dépendances du modèle. Au final, OpenMP n’apporte aucun gain significatif, ni en temps ni en énergie.
+
+À l’inverse, MPI se révèle nettement plus efficace. Le découpage spatial du domaine, associé à des communications limitées aux frontières, permet une montée en charge solide jusqu’à 12 processus, avec un optimum énergétique et temporel autour de cette valeur. Même à 16 processus, malgré un léger overhead, MPI reste très performant. Dans sa configuration optimale, la version MPI pure atteint un speedup d’environ ×6 et réduit la consommation d’énergie d’environ 50 %, ce qui en fait la solution la plus rapide, la plus stable et la plus économe pour ce modèle.
+
+Les versions hybrides (MPI + OpenMP) montrent un comportement intermédiaire : la version propre (hybrid_v2) est plus rapide mais plus énergivore, car elle sollicite fortement les unités vectorielles. Malgré quelques configurations intéressantes (notamment 8 MPI / 2 OMP), l’hybride ne parvient pas à surpasser MPI pur, ni en temps ni en énergie.
+
+En conclusion, le modèle SEIR bénéficie très peu des optimisations locales (cache, vectorisation, OpenMP), mais exploite pleinement le parallélisme inter‑processus. La version MPI pure, dans sa configuration optimale, constitue donc la solution la plus performante et la plus efficace énergétiquement pour ce type de simulation
+
+
+# Annexe
+
+### Annexe SEIR_A
+
+```{r, echo=FALSE}
+Mean_res <- read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/SEIR/results/seq_global_2.csv")
+
+p <- Mean_res %>%
+  filter(nb_indiv <80000) %>% 
+  filter(exec == "seq_C_friendly") %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ pct_infect) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()+
+  labs(color = "Nombre d'individus",title = "Incidence du % d'infecté")
+plot_auto(p)
+
+```
+
+
+```{r eval=FALSE, include=FALSE, results='hide'}
+infect_mpi_CF = read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/SEIR/results/infect_mpi_CF.csv")
+infect_mpi_CNOF = read.csv("C:/Users/pluch/Desktop/Fac/M1/S2/Stage/code/SEIR/results/infect_mpi_CNOF.csv")
+df = rbind(infect_mpi_CF,infect_mpi_CNOF)
+
+
+Mean_res = df %>% group_by(exec,opt,nb_indiv,size,pct_infect) %>%
+  summarise(G_time = mean(GT),G_energie= mean(GE),G_power = mean(GP),A_time = mean(AT),A_energie = mean(AE),A_power = mean(AP),.groups =  "drop")
+
+
+Mean_res_plot <- Mean_res %>%
+  mutate(
+    tooltip = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectes :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>energie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- Mean_res_plot %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = tooltip
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+plot_auto(p)
+
+
+
+
+ref_algo <- "mpi_CF"
+
+ref_df <- Mean_res %>%
+  filter(exec == ref_algo) %>%
+  select(size, nb_indiv, 
+         ref_time = A_time,
+         ref_energy = A_energie)
+
+ratio_df <- Mean_res %>%
+  left_join(ref_df,
+            by = c("size", "nb_indiv")) %>%
+  mutate(
+    speedup = ref_time / A_time,
+    energy_ratio = A_energie / ref_energy
+  )
+
+
+
+ratio_summary <- ratio_df %>%
+  group_by(exec) %>%
+  summarise(
+    speedup = mean(speedup, na.rm = TRUE),
+    energy_ratio = mean(energy_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+kable(ratio_summary, caption = "Résumé des ratios par algorithme")
+
+
+```
+
+```{r, echo=FALSE,results='hide'}
+
+# Avant d’interpréter les résultats, il faut rappeler que les mesures énergétiques ne couvrent que la consommation CPU.
+# La consommation mémoire — nécessairement plus élevée avec des structures volumineuses — n’est pas comptabilisée.
+# Cela biaisent légèrement l’analyse en donnant à la version non optimisée un avantage énergétique qui pourrait être fortement réduit, voire annulé, si l’énergie mémoire était intégrée.
+# Gardant cela en tête, on peut examiner les tendances observées.
+# 
+# La variante cache‑friendly offre un avantage quasi systématique sur le temps d’exécution : des structures ~40% plus compactes apportent en moyenne 20% de gain, avec un léger désavantage uniquement sur les très petites tailles.
+# 
+# L’impact énergétique est plus variable.
+# En moyenne, la version non optimisée semble légèrement meilleure (~5%), mais deux régimes apparaissent nettement :
+# 
+# Grandes tailles × grand nb_indiv  
+# → La version cache‑friendly devient clairement supérieure :
+# +37% en temps, +15% en énergie.
+# 
+# Petites tailles × petit nb_indiv  
+# → L’avantage énergétique s’atténue, disparaît, puis s’inverse autour de
+# size ~ 2000, nb_indiv ~ 80000.
+# 
+# En résumé :
+# 
+# Temps : avantage stable pour la version cache‑friendly.
+# 
+# Énergie : avantage dépendant du régime, parfois inversé pour les petites tailles — mais cette inversion est probablement amplifiée par l’absence de mesure de la consommation mémoire.
+
+```
+
+
+
+
+
+
+
+
+

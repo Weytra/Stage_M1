@@ -1,0 +1,107 @@
+pret pour le pret premier bench propre avec toute les opti disponible avec cette entete : 
+    BASEFLAGS = -march=native -funroll-loops -Iinclude/headers
+    OMPFLAGS  = -fopenmp
+    LDFLAGS   = -lm
+    MPI_FLAGS = --oversubscribe --mca btl vader,self --mca btl_tcp_if_exclude lo,docker,virbr0,enp0s3
+
+
+    ########################################
+    # OPTIMISATIONS À TESTER
+    ########################################
+    OPTS = O0 O1 O2 O3 Ofast
+
+fichier resultat : 
+    infect_seq : version sequentielle de base 
+    infect_mpi : version mpi de base
+    infect_omp : complexe avec parallelisation des deplacement (couteux)
+FAIT
+
+prochain bench : 
+    tester omp sans paral des deplacement : 
+    modif : 
+        l374 : next_step_omp(G) --> next_step_omp_2(G);   
+        infect_omp_2.csv
+
+        FAIT     
+
+    tester infect_seq sans vectorisation : 
+        ajouter -fno-tree-vectorise dans les flags de compile
+        changer le nom du csv en seq_no_vect
+
+        FAIT
+
+    tester avec vectorisation forcer : 
+        ajouter -ftree-vectorise dans les flags de compile
+        changer le nom du csv en seq_A_vect_forced
+        FAIT
+
+    tester mpi_omp : 
+        ajouter #include <omp.h> dans le fichier infect_mpi.c
+        et le code gpto pas encore fait
+
+tester les versions omp de base avec different nb de thread
+
+
+
+
+tester les different positionement des donnee dans la structure pour 
+verifier l'impact memoire
+*_C_frienly.csv
+avec les parametre suivant :
+OPTS = O3
+########################################
+# PARAMÈTRES BENCHMARK
+########################################
+SIZES = 200 400 800 1200 2000
+NB_INDIV = 10000 20000 40000 #80000 12000
+INFECT_PCT = 10 20 30 40 60
+NB_IT = 200
+REPEAT = 5
+MPI_PROCS = 8 12 16
+OMP_THREADS = 16
+/!\ mpi tester dans un seule %age d'infecter pour reduire le temps
+cette argument semble quasi pas afecter le temps d'execution
+
+
+
+
+
+infect_seq_big_10k_it
+########################################
+# PARAMÈTRES BENCHMARK
+########################################
+SIZES = 400 800 1200 2000
+NB_INDIV = 40000 80000 12000
+INFECT_PCT = 20 30 40 60
+NB_IT = 20000
+
+dans le lancement des big arreter au cour de seq car trop long :
+deux ligne incoherente (avec 20K iteration):
+seq,O3,400,80000,40,32000,239.928571,52940.432917999999,220.650807,239.870800,52939.993670000003,220.702118
+seq,O3,800,40000,20,8000,200.441757,49652.485353999997,247.715276,200.375173,49651.966414000002,247.795003
+
+
+
+
+mpi_big
+omp_big
+seq_big
+ici 500 iteration, avant 200 (il me semble)
+
+uniquement en 03
+et avec compile :
+BASEFLAGS = -march=native -funroll-loops -Iinclude/headers
+OMPFLAGS  = -fopenmp
+LDFLAGS   = -lm
+MPI_FLAGS = --oversubscribe --mca btl vader,self --mca btl_tcp_if_exclude lo,docker,virbr0,enp0s3
+
+########################################
+# PARAMÈTRES BENCHMARK
+########################################
+SIZES = 400 800 1200 2000
+NB_INDIV = 40000 80000 12000
+INFECT_PCT = 20 30 40 60
+NB_IT = 500
+REPEAT = 5
+MPI_PROCS = 8 12 16
+OMP_THREADS = 16

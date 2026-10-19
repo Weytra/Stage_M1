@@ -1,0 +1,79 @@
+ce qui s'est avéré le plus utiles : 1 - transposition, 2 - openmp, 3 - mpi, 4 - blocking, 5 - optimisation compilo, 6 - vectorisation
+
+Concerant le blocking il s'est avéré tres efficace pour les algos avec matrice non transposé, mais moins performant pour 
+les matrice transposé, ce qui s'explique par la localité du cache, elle est ameliorer lors de lmatrice non transposé car
+on evite les saut de pages recurent, mais avec matrice transposé on a plus ce probleme de saut de pages dans l'ordre des calculs donc
+le blocking ajoute de la complexité et oblige a parcourir des morceux de pages la ou la transposition seule permet de parcoiurir toute la pages, ou du moins toute la ligne d'un seul coup.
+
+au vu de ses observation il serrait interesant a present de refaire des bench avec les diferent algo (surtout paralele et open mp)
+avec des matrices transposé.
+
+Analyse des verison TRANSPOSÉ jusqua 8192:
+SUMMA : la transposition permet de passer d'un temps d'execution de 30-40s a 3.6, désormais le temps d'execution de 8192 tr = 4096 non-tr
+surprenant mais apparemment pour de si grande taille 4 processus est le plus rapide, a 34s vs 42 avec 16p
+
+La puissance pour faire tourner les codes avec matrice transposé consomme beaucoup plus de puissance allant de 15W en non-transposé a 45W avec tr
+
+openmp est plus interesant que mpi, avec un temps de 11.6 en 8K contre 35s en mpi
+
+le fait de vectoriser mpi n'apporte aucun gain de temps, on a meme pour 8K un temps ex-aequo ! 
+preuve que l'auto vectorisation par le compilateur est aussi performante qu'une vectorisation manuelle, donc cela ne serrt pas de s'embeter a le faire nous meme
+la consomation energetique est également identique, donc ma conclusion est que le compilateur fait les meme opti que ce que l'on peut faire a la main.
+mpi_omp : la vectorisation a nouveau apporte rien.
+
+ajouter omp a mpi aporte des gains de temps, on passe de de 34s a 28, et la conso d'energie diminue de la meme facon.
+
+concernant les optimisation, O3 s'est montrer ici tres légèrement meilleur que 0fast sur mpi_omp_avx_blk
+
+cette fois le blocking a apporte de gros gain de performance pour tout les programme teste, cad en seq et en mpi_omp_avx (O3 et Ofast), on passe de 22s blk = 8 a 6.8 blk = 64
+et evidament la consomation energetique ce retrouve affecter, on a une difference de temps de 3* et d'energie de 2.8* donc le meme programme blocke est bien plus rapide et econome en energie !
+
+pour la conso energie de mpi, avec 4 proc on est a 1120 contre 1500 avec 16proc, ce qui, en plus est moins rapide, de 32 a 42, donc encore une fois moins de temps moins de consomation
+
+un code omp (mise en place simple) permet de diviser par 5 (certains cas 8) le temps d'execution par rapport a la version seq sur laquelle elle ce base.
+Le blocking sur un code omp apporte des gains considerable 
+
+
+A present d'apres lmes resultat sur une seule machine, l'ordre des gains apporte par les optimisation sont : 
+et par rapport au temps de developement que ca rajoute l'ordre et le suivant : transposition, omp, blocking
+gain de temps : (sur transposé)
+	omp : 6
+	blocking : 2-4
+	mpi : 
+	transposition : ??? 6 -8?
+	optimisation compilo : 
+
+
+la consomation energetique est toujours tres fortement correle au temps en évoluant de la meme facon, on reste toujours dans le meme ordre de grandeur, si on double le temps on double la consomation
+
+
+
+
+analyse open mp  avec matrice non transposé:
+open mp reagi tres bien au blocking ici, mais de preference sur des petite taille de block, apparement la taille la plus rapide ici est 8 avec un temps de 0.6 en 2048, contre 2.2s avec block = 64, et sans blocking on est a 5s. cote energie on est a 23J pour blk 8 contre 150 sans blocking, donc pas *10 comme le temps mais de l'ordre de grandeur malgres tout
+ici ajouter mpi a open mp semble aporte un gain mais de l'orde de 20% uniquement. (ca passe de 4.8 a 3.8)
+et donc logiquement ajouter le blocking a openmp+mpi ameliorer le temps et l'energie en passant a 0.75 pour 38J (vs 3.08 pour 107J)
+
+La puissance consomé semble etre un bon indicateur de l'utilisation du cpu par rapport a la memoire (power + eleve = meilleur utilisation cpu)
+
+Donc ici : OPEN mp = gros gain
+ci on rajoute vectorisation : gain de 20%
+blocking : a l'ideal divise par 8 le temps et l'energie
+ajout de mpi : gain de 20%
+ajout du blocking dans mpi : divise par 5 le temps et par 3 l'energie
+mais le mieux est simplement omp + blocking : 0.6s/23J contre 0.75s/30J pour omp + mpi + blocking + avx
+rq avx = avx512 = vectorisation 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

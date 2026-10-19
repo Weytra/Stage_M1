@@ -1,0 +1,2 @@
+Les algorithmes SUMMA, FOX et Cannon sont conçus pour des architectures distribuées multi‑nœuds. Sur une machine mono‑nœud, leur surcharge de communication MPI domine le temps d’exécution, ce qui les rend moins performants que des algorithmes plus simples comme mult\*.
+Même si les implémentations mult\* ne parallélisent pas efficacement le calcul, leur absence de communication MPI leur permet d’obtenir de meilleurs temps d’exécution globaux. 

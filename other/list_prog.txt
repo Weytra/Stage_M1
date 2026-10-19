@@ -1,0 +1,14 @@
+type de problème : multiplication matricielle,	jeu de la vie, SEIR,  dissipation chaleure
+
+méthode de division : sans parallélisation, division par ligne contiguë/dis-contiguë, division par colonne, 
+
+multiplication matricielle : 
+tester sur des matrice carre, triangulaire, avec diferentes taille, et dispparité entre ligne et colone
+
+tester le temps d'execution en faisant une moyenne sur un grand nombre d'execution.
+
+tester la diference de rapidité d'execution entre matrice lineaire et bidimensionelle.
+
+tester les différents flags mpi
+
+implementer les methode de SHANON, CANON, L AUTRE ?

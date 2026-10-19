@@ -1,0 +1,300 @@
+le changement de fox de la methode MPI naîve a la methode MPI propre
+ne donne pas de vrai difference de perf (variablitée non significative)
+mais cela allege la boucle principale de code, rendant le code plus 
+lisible,mais pour cela il faut donc passer plus de temps a preparer la
+strcture mpi.
+
+
+Mon pc a des pages de 4096 bytes, donc etant donné qu'un int prend 
+4 octets, un blocking optimal serrati donc de 1024, donc place au
+blocking en 1024 sur fox.
+   
+            
+  Analyse performance – Cache, TLB et IPC
+
+Lors de l’exécution parallèle de l’algorithme de Fox sur une matrice 1024×1024 :
+
+Cache et données (dTLB)
+Les blocs de 1024 entiers tiennent parfaitement dans le cache L1/L2.
+Les cache misses sont très faibles (~1 %), et les dTLB misses restent négligeables (<0,5 %).
+Conclusion : le blocking choisi est efficace et limite les défauts mémoire coûteux.
+Instruction TLB (iTLB)
+Le taux de iTLB miss est plus élevé (~3–4 %), ce qui indique que le code occupé par les boucles imbriquées dépasse légèrement la capacité de l’iTLB L1.
+L’optimisation du code (-O2) réduit légèrement ce taux, ce qui se traduit par une exécution plus fluide.
+IPC et temps d’exécution
+Le nombre d’instructions par cycle (IPC) diminue après optimisation (~2 → 1,5), mais le temps réel d’exécution diminue.
+Interprétation : l’IPC n’est pas un indicateur absolu de performance ; la réduction des stalls et un meilleur ordonnancement des instructions compensent largement la baisse de l’IPC.
+Conclusion générale
+Le blocking choisi, combiné avec une compilation optimisée, permet de maximiser l’efficacité des caches et TLB tout en réduisant le temps global, même si l’IPC chute.
+Les défauts de cache et TLB restent mineurs, donc le goulot d’étranglement n’est pas la mémoire mais le traitement CPU et la communication MPI.
+
+
+Stabilité numérique
+En arithmétique entière, les opérations sont exactes.
+
+Les versions optimisées (AVX512, MPI, MPI+AVX512) produisent exactement le même résultat que la version scalaire.
+
+En arithmétique flottante, l’ordre des opérations diffère selon les versions, ce qui peut introduire de petites variations numériques.
+
+Une mesure de stabilité a été réalisée via l’erreur absolue et relative.
+
+Les erreurs observées restent dans les limites de la précision machine.
+
+Conclusion : les optimisations n’introduisent pas d’instabilité significative.
+
+Analyse de bench:
+  la verion classique seq dure 42 pour 600J en 2048
+  SUMMA dure lui 1.1s et consome 50J en 2048 avec np = 9
+  donc consomation energetique divisé par 12 et temps par 40
+
+Cela semble au premier abord au gain anormale mais y reflechisant bien
+ca s'explique par plusieurs optimisation implicite. Premierement
+on passe a 9 processus vs 1 donc on peux esperer diviser le temps par 
+9, donc une bonne partie viens de la, deuxiemement le fait de faire
+des decoupage de matrice dans summa fait que la localité memoire
+des pour chaque procesus est fortement ameliorer, la version naïve
+oblige a charger une nouvelle page a chaque itération sur B, tandis
+que avec SUMMA (ou tout autre mpi grille) on a avec 9 processus
+des matrice 3* plus petite, donc gros gain de localité memoire la dessus
+de plus, avec la compilation en 03, le code mpi ce retrouve automatiquement
+vectoriser ce qui augmente la rapidité d'execution des boucles considerablement
+De plus l'amelioration de la localité memoire augmente considerablement
+le temps d'execution et la conso energetique car le processeur
+ne perd pas du temps a attendre la ram et que la conso energetique
+et temporaire du la ram est tres lente par rapport au processuer
+donc limiter les acces discontigue ameliore dradstiqueemnt le programme
+
+
+concernant la vectorisation manuel elle ne semble pas particulierement
+efficace par rapport a la vectorisation automatique, sur les graphique
+on peux voir des temps d'execution et de consomation energetique
+legerement meilleur en vectorisation automatique.
+
+rq : la puissance consomé est enorme dans ces deux derniere version allant
+a 45 dans les version les plus rapide mpi, contre seuelemnt 13W pour les
+version sequentielle.
+
+NOMBRE ABERANT DE VERSION POSSIBLE :
+algo : seq, my_paral, fox, canon, summa : 5
+np :        4, 9, 16                    : 3 (pour rester raisonable)
+size : 128, 256, 512, 1024, 2048, 4096  : 6
+block : 1 8 16 32 64 128                : 6
+opt   : O0 O1 O2 O3 Ofast               : 5
+openmp : oui/non                        : 2
+vectorisation :                         : 2
+transposition : oui/non                 : 2
+_____________________________________________
+total :          5*3*6*6*5*2*2*2        : 21 600
+donc il y a 21600 version possible.
+rien qu'en terme d'execution ci on considere 1s par execution(optimiste), 
+combiner au fait de rajouter 1s de pause entre chaque execution (stabilité du proc)
+on se retouve a 43 000 s soit 12h d'execution consecutive !!
+D'autant plus qu'il faudrais au minimum executer chaque version 5 fois
+pour faire une moyenne des temps on passerais donc a 2,5J d'execution complete !!!
+Le tout en etant optimiste sur le temps d'execution moyen, car les deux
+deux plus grosse taille tourne plus autour des 4 a 30s
+
+1. **Analyse théorique du coût de calcul** (déjà faite, mais reformattée pour cohérence)
+2. **Analyse théorique du coût de communication** pour SUMMA
+3. **Comparaison concise SUMMA / Cannon / Fox**
+4. Le tout en style **rapport HPC**, clair, académique, prêt à glisser dans ton document.
+
+---
+
+# 📘 **Analyse théorique du produit matriciel parallèle : calcul et communication**
+
+## 1. Coût de calcul : naïf séquentiel vs SUMMA parallèle
+
+### 1.1 Produit matriciel naïf séquentiel
+
+Le produit matriciel classique :
+
+\[
+C = A \times B
+\]
+
+pour des matrices carrées de taille \(N \times N\) nécessite :
+
+\[
+\text{nb\_op}_{\text{naïf}} = 2N^3 \quad (\mathcal{O}(N^3))
+\]
+
+Ce schéma ne réalise **aucun blocage** et présente une **localité mémoire très faible**, ce qui limite fortement les performances sur les architectures modernes.  
+Le **temps d’exécution séquentiel** est donc :
+
+\[
+T_{\text{seq}} \propto N^3
+\]
+
+---
+
+### 1.2 Répartition du travail dans SUMMA
+
+SUMMA répartit les matrices sur une grille de processus \(\sqrt{P} \times \sqrt{P}\).  
+Chaque processus détient un bloc local de taille :
+
+\[
+\frac{N}{\sqrt{P}} \times \frac{N}{\sqrt{P}}
+\]
+
+À chaque étape \(k\), un processus calcule :
+
+\[
+C_{ij} \;+=\; A_{ik} \times B_{kj}
+\]
+
+Le **nombre d’opérations locales** est :
+
+\[
+\text{nb\_op}_{\text{local}} = 2\left(\frac{N}{\sqrt{P}}\right)^3
+\]
+
+Le nombre total d’opérations reste identique :
+
+\[
+P \cdot 2\left(\frac{N}{\sqrt{P}}\right)^3 = 2N^3
+\]
+
+SUMMA ne réduit donc pas le nombre total d’opérations, mais **répartit équitablement le travail**.
+
+---
+
+### 1.3 Temps parallèle idéal
+
+Le temps parallèle est dominé par le travail local :
+
+\[
+T_{\text{par}} \propto \left(\frac{N}{\sqrt{P}}\right)^3
+= \frac{N^3}{P^{3/2}}
+\]
+
+Le **speedup théorique** par rapport au naïf est alors :
+
+\[
+S = \frac{T_{\text{seq}}}{T_{\text{par}}}
+= P^{3/2}
+\]
+
+Ce résultat est remarquable :  
+👉 **SUMMA peut être super-linéaire par rapport au naïf séquentiel**, car il bénéficie d’une **bien meilleure localité mémoire**.
+
+Pour \(P = 9\) :
+
+\[
+S_{\text{théorique}} = 9^{3/2} = 27
+\]
+
+Dans la pratique, des speedups encore plus élevés sont observés lorsque le code séquentiel est naïf, ce qui correspond aux mesures expérimentales.
+
+---
+
+## 2. Coût de communication de SUMMA
+
+SUMMA nécessite, à chaque étape \(k\) :
+
+- la diffusion d’un bloc \(A_{ik}\) sur chaque ligne de la grille,
+- la diffusion d’un bloc \(B_{kj}\) sur chaque colonne.
+
+Chaque bloc a une taille :
+
+\[
+\left(\frac{N}{\sqrt{P}}\right)^2
+\]
+
+Il y a \(\sqrt{P}\) étapes.
+
+### 2.1 Volume total de communication
+
+Le volume total échangé par processus est :
+
+\[
+V_{\text{SUMMA}} 
+= 2 \cdot \sqrt{P} \cdot \left(\frac{N}{\sqrt{P}}\right)^2
+= 2 \cdot \frac{N^2}{\sqrt{P}}
+\]
+
+Donc :
+
+\[
+V_{\text{SUMMA}} = \mathcal{O}\left(\frac{N^2}{\sqrt{P}}\right)
+\]
+
+Ce coût est **sous-quadratique**, alors que le calcul est **cubique**.
+
+---
+
+### 2.2 Ratio communication / calcul
+
+Le calcul local est :
+
+\[
+\mathcal{O}\left(\frac{N^3}{P^{3/2}}\right)
+\]
+
+La communication est :
+
+\[
+\mathcal{O}\left(\frac{N^2}{\sqrt{P}}\right)
+\]
+
+Le ratio est :
+
+\[
+\frac{\text{comm}}{\text{calc}}
+= \frac{N^2 / \sqrt{P}}{N^3 / P^{3/2}}
+= \frac{1}{N}
+\]
+
+👉 **Plus la matrice est grande, plus la communication devient négligeable.**
+
+C’est exactement ce que tu observes expérimentalement :  
+le coût MPI est très faible par rapport au calcul.
+
+---
+
+## 3. Comparaison concise : SUMMA, Cannon et Fox
+
+### 3.1 Cannon
+
+- Communication : **shift circulaire** de blocs A et B  
+- Volume : \(\mathcal{O}(N^2 / \sqrt{P})\) (comme SUMMA)  
+- Avantage : communication régulière, parfaitement équilibrée  
+- Inconvénient : nécessite une **grille carrée** et un **shift initial coûteux**
+
+### 3.2 Fox
+
+- Diffusion de A par ligne  
+- Rotation circulaire de B par colonne  
+- Volume : \(\mathcal{O}(N^2 / \sqrt{P})\)  
+- Avantage : simple à implémenter  
+- Inconvénient : charge parfois moins équilibrée que Cannon
+
+### 3.3 SUMMA
+
+- Diffusion de A par ligne et de B par colonne à chaque étape  
+- Volume : \(\mathcal{O}(N^2 / \sqrt{P})\)  
+- Avantages :
+  - fonctionne sur toute grille rectangulaire  
+  - communication bien répartie  
+  - excellent compromis simplicité / performance  
+- Inconvénient : nécessite deux diffusions par étape
+
+### 3.4 Synthèse
+
+| Algorithme | Communication | Contraintes | Équilibrage | Commentaire |
+|------------|---------------|-------------|-------------|-------------|
+| **Naïf** | 0 | — | — | Trop lent, pas de localité |
+| **Cannon** | \(N^2/\sqrt{P}\) | grille carrée | excellent | très performant mais rigide |
+| **Fox** | \(N^2/\sqrt{P}\) | grille carrée | bon | simple, efficace |
+| **SUMMA** | \(N^2/\sqrt{P}\) | aucune | excellent | le plus flexible et utilisé en pratique |
+
+---
+
+## 4. Conclusion générale
+
+- Le produit matriciel naïf est fortement limité par la mémoire.  
+- SUMMA exploite la **localité**, le **blocage**, et le **parallélisme**, ce qui réduit le temps de calcul d’un facteur pouvant dépasser \(P\).  
+- Le speedup théorique par rapport au naïf peut atteindre **\(P^{3/2}\)**.  
+- Le coût de communication est **sous-quadratique**, donc négligeable pour des matrices suffisamment grandes.  
+- Comparé à Cannon et Fox, SUMMA offre le meilleur compromis entre flexibilité, simplicité et performance.
+

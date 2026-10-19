@@ -1,0 +1,61 @@
+==== Résultats d'exécution ====
+
+==============================
+  OPTIMISATION O0
+==============================
+--- Taille 128 ---
+Moyenne sur 10 exécutions : .00262450000000000000 secondes
+--- Taille 256 ---
+Moyenne sur 10 exécutions : .01986170000000000000 secondes
+--- Taille 512 ---
+Moyenne sur 10 exécutions : .17797390000000000000 secondes
+--- Taille 1024 ---
+Moyenne sur 10 exécutions : 2.63336960000000000000 secondes
+
+==============================
+  OPTIMISATION O1
+==============================
+--- Taille 128 ---
+Moyenne sur 10 exécutions : .00149730000000000000 secondes
+--- Taille 256 ---
+Moyenne sur 10 exécutions : .01504920000000000000 secondes
+--- Taille 512 ---
+Moyenne sur 10 exécutions : .16131770000000000000 secondes
+--- Taille 1024 ---
+Moyenne sur 10 exécutions : 3.37992930000000000000 secondes
+
+==============================
+  OPTIMISATION O2
+==============================
+--- Taille 128 ---
+Moyenne sur 10 exécutions : .00143620000000000000 secondes
+--- Taille 256 ---
+Moyenne sur 10 exécutions : .01244700000000000000 secondes
+--- Taille 512 ---
+Moyenne sur 10 exécutions : .17579620000000000000 secondes
+--- Taille 1024 ---
+Moyenne sur 10 exécutions : 3.23836720000000000000 secondes
+
+==============================
+  OPTIMISATION O3
+==============================
+--- Taille 128 ---
+Moyenne sur 10 exécutions : .00122680000000000000 secondes
+--- Taille 256 ---
+Moyenne sur 10 exécutions : .01361030000000000000 secondes
+--- Taille 512 ---
+Moyenne sur 10 exécutions : .15318650000000000000 secondes
+--- Taille 1024 ---
+Moyenne sur 10 exécutions : 3.27420260000000000000 secondes
+
+==============================
+  OPTIMISATION Ofast
+==============================
+--- Taille 128 ---
+Moyenne sur 10 exécutions : .00115570000000000000 secondes
+--- Taille 256 ---
+Moyenne sur 10 exécutions : .01261630000000000000 secondes
+--- Taille 512 ---
+Moyenne sur 10 exécutions : .14832320000000000000 secondes
+--- Taille 1024 ---
+Moyenne sur 10 exécutions : 3.17914080000000000000 secondes

@@ -1,0 +1,31 @@
+Dans ce benchmark on va tester les elements suivants :
+    Comparaison final des different algos.
+
+Tout est ici compiler avec -O3 !
+
+
+compilation : make all
+netoyage : make clean
+
+Seq : 
+    Test avec transposition ET blocking :
+        make run_seq_blk
+    
+MPI : 
+    Test de summa avec transposition et sans blocking 
+        make run_mpi
+    Test de summa avec vectorisation manuelle et transposition:
+        make run_mpi_avx
+
+MPI X OpenMP :
+    Test avec transposition sur base de summa avec threads
+        make run_mpi_omp
+    Test avec en plus la vectorisation manuelle : 
+        make run_mpi_omp_avx
+    Test fullstack : MPI + OMP + blocking + transposition + vectorisation:
+        make run_mpi_omp_avx_blk
+    Test fullstack avec Ofast a la place de O3:
+        make run_mpi_omp_avx_blk_Of
+
+
+rq : pour tester sans blocking modifier le makefile et mettre 0 en tant que taille de block.

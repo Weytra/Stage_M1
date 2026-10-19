@@ -1,0 +1,512 @@
+.
+├── Makefile
+├── Makefile.src
+├── Obsevation.txt
+├── analyse.R
+├── analyse_bench.R
+├── arbre.txt
+├── bin
+│   ├── parallele
+│   │   ├── SUMMA_
+│   │   │   ├── O1
+│   │   │   ├── O2
+│   │   │   ├── O3
+│   │   │   └── Ofast
+│   │   ├── SUMMA_vect
+│   │   │   ├── O1
+│   │   │   ├── O2
+│   │   │   ├── O3
+│   │   │   └── Ofast
+│   │   ├── cannon_2
+│   │   │   ├── O1
+│   │   │   ├── O2
+│   │   │   ├── O3
+│   │   │   └── Ofast
+│   │   ├── fox_2
+│   │   │   ├── O1
+│   │   │   ├── O2
+│   │   │   ├── O3
+│   │   │   └── Ofast
+│   │   ├── fox_3
+│   │   │   ├── O1
+│   │   │   ├── O2
+│   │   │   ├── O3
+│   │   │   └── Ofast
+│   │   ├── mlt_mat_prl_blk
+│   │   │   ├── O1
+│   │   │   ├── O2
+│   │   │   ├── O3
+│   │   │   └── Ofast
+│   │   ├── mult_bcast_blk
+│   │   │   ├── O1
+│   │   │   ├── O2
+│   │   │   ├── O3
+│   │   │   └── Ofast
+│   │   └── mult_send_rcv_replace
+│   │       ├── O1
+│   │       ├── O2
+│   │       ├── O3
+│   │       └── Ofast
+│   └── seq
+│       ├── mult_mat_seq_blocking
+│       │   ├── O1
+│       │   │   └── mult_mat_seq_blocking
+│       │   ├── O2
+│       │   │   └── mult_mat_seq_blocking
+│       │   ├── O3
+│       │   │   └── mult_mat_seq_blocking
+│       │   └── Ofast
+│       │       └── mult_mat_seq_blocking
+│       ├── mult_mat_seq_vecto
+│       │   ├── O1
+│       │   │   └── mult_mat_seq_vecto
+│       │   ├── O2
+│       │   │   └── mult_mat_seq_vecto
+│       │   ├── O3
+│       │   │   └── mult_mat_seq_vecto
+│       │   └── Ofast
+│       │       └── mult_mat_seq_vecto
+│       └── mult_mat_seq_vecto_tr
+│           ├── O1
+│           │   └── mult_mat_seq_vecto_tr
+│           ├── O2
+│           │   └── mult_mat_seq_vecto_tr
+│           ├── O3
+│           │   └── mult_mat_seq_vecto_tr
+│           └── Ofast
+│               └── mult_mat_seq_vecto_tr
+├── conclusion.txt
+├── donnee
+│   ├── 16_by_blk_0.mat
+│   ├── 16_by_blk_0.txt
+│   ├── 18_by_blk_0.mat
+│   └── 18_by_blk_0.txt
+├── make_id
+├── old_prog
+│   ├── fox_base.c
+│   ├── fox_cop.c
+│   ├── mult_bcast.c
+│   └── mult_mat_paral.c
+├── on_work.md
+├── python
+│   ├── convert_tabs.py
+│   └── visualisation.py
+├── readme
+├── recap_energie_stage.md
+├── resultat
+│   ├── blocking
+│   │   ├── Rplot.png
+│   │   ├── Rplot01.pdf
+│   │   ├── Rplot02.png
+│   │   └── results.csv
+│   ├── parallele
+│   │   ├── SUMMA_
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── SUMMA_vect
+│   │   │   ├── O1
+│   │   │   ├── O2
+│   │   │   ├── O3
+│   │   │   └── Ofast
+│   │   ├── cannon_2
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── fox_2
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── fox_3
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── fox_cop
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── mlt_mat_prl_blk
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── mlt_prl_fox_2
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── mult_bcast
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── mult_bcast_blk
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── mult_mat_paral
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   ├── mult_send_rcv_replace
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── Ofast
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── resultat_global.csv
+│   │   └── resultat_global.csv
+│   ├── seq
+│   │   ├── mult_mat_seq
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   ├── O3
+│   │   │   └── Ofast
+│   │   ├── mult_mat_seq_blocking
+│   │   │   ├── O0
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── Ofast
+│   │   │       ├── result.csv
+│   │   │       └── result.txt
+│   │   ├── mult_mat_seq_vecto
+│   │   │   ├── O0
+│   │   │   ├── O1
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O2
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   ├── O3
+│   │   │   │   ├── result.csv
+│   │   │   │   └── result.txt
+│   │   │   └── Ofast
+│   │   │       ├── result.csv
+│   │   │       └── result.txt
+│   │   └── mult_mat_seq_vecto_tr
+│   │       ├── O0
+│   │       ├── O1
+│   │       │   ├── result.csv
+│   │       │   └── result.txt
+│   │       ├── O2
+│   │       │   ├── result.csv
+│   │       │   └── result.txt
+│   │       ├── O3
+│   │       │   ├── result.csv
+│   │       │   └── result.txt
+│   │       └── Ofast
+│   │           ├── result.csv
+│   │           └── result.txt
+│   ├── seq_calsique
+│   │   ├── result.csv
+│   │   └── results.txt
+│   └── visualisation_donnee.R
+├── src
+│   ├── bench
+│   │   ├── Makefile
+│   │   ├── Makefile.src
+│   │   ├── results
+│   │   │   ├── avx.csv
+│   │   │   ├── avx_1024.txt
+│   │   │   ├── avx_2048.txt
+│   │   │   ├── avx_512.txt
+│   │   │   ├── avx_tr.csv
+│   │   │   ├── global
+│   │   │   │   ├── Global_result_mpi.csv
+│   │   │   │   ├── Global_result_mpi.txt
+│   │   │   │   ├── glb_seq.csv
+│   │   │   │   └── gloabl_bench.csv
+│   │   │   ├── mpi.csv
+│   │   │   ├── mpi_avx.csv
+│   │   │   ├── seq.csv
+│   │   │   ├── seq_1024.txt
+│   │   │   ├── seq_2048.txt
+│   │   │   ├── seq_512.txt
+│   │   │   ├── seq_auto_vect.csv
+│   │   │   ├── seq_blk.csv
+│   │   │   └── seq_pure.csv
+│   │   ├── scripts
+│   │   └── to_test
+│   │       ├── avx
+│   │       │   ├── matmul_avx
+│   │       │   ├── matmul_avx_tr
+│   │       │   ├── mult_mat_seq_vecto.c
+│   │       │   └── mult_mat_seq_vecto_tr.c
+│   │       ├── mpi
+│   │       │   ├── SUMMA_.c
+│   │       │   └── matmul_mpi
+│   │       ├── mpi_avx
+│   │       │   ├── SUMMA_vect.c
+│   │       │   └── matmul_mpi_avx
+│   │       └── seq
+│   │           ├── matmul_seq
+│   │           ├── mult_mat_seq_blocking.c
+│   │           ├── seq_auto_vect
+│   │           └── seq_pure
+│   ├── bench_2
+│   │   ├── Makefile
+│   │   ├── results
+│   │   │   ├── avx_omp.csv
+│   │   │   ├── global
+│   │   │   │   └── gloabl_bench.csv
+│   │   │   ├── mpi_avx_fs.csv
+│   │   │   ├── mpi_omp.csv
+│   │   │   ├── seq_auto_vect.csv
+│   │   │   ├── seq_blk_omp.csv
+│   │   │   ├── seq_omp.csv
+│   │   │   └── seq_pure.csv
+│   │   └── to_test
+│   │       ├── mpi
+│   │       │   ├── SUMMA_.c
+│   │       │   └── matmul_mpi_omp
+│   │       ├── omp_vecto
+│   │       │   ├── matmul_avx_omp
+│   │       │   └── mult_mat_seq_omp_vect.c
+│   │       ├── seq
+│   │       │   ├── matmul_seq_omp
+│   │       │   └── mult_mat_seq_omp.c
+│   │       └── ultime
+│   │           ├── full_stack.c
+│   │           └── summa_fullstack
+│   ├── bench_3_inutiles
+│   │   ├── Makefile
+│   │   ├── results
+│   │   │   ├── avx_tr.csv
+│   │   │   ├── mpi.csv
+│   │   │   ├── mpi_avx.csv
+│   │   │   ├── seq.csv
+│   │   │   └── seq_blk.csv
+│   │   └── to_test
+│   │       ├── avx
+│   │       │   ├── matmul_seq_avx_tr
+│   │       │   └── mult_mat_seq_vecto_tr.c
+│   │       ├── mpi
+│   │       │   ├── SUMMA_.c
+│   │       │   └── summa_tr
+│   │       ├── mpi_avx
+│   │       │   ├── SUMMA_vect.c
+│   │       │   └── summa_vect_tr
+│   │       └── seq
+│   │           ├── matmul_seq
+│   │           └── mult_mat_seq_blocking.c
+│   ├── bench_4
+│   │   ├── Makefile
+│   │   ├── bin
+│   │   │   ├── mpi
+│   │   │   ├── mpi_avx
+│   │   │   ├── mpi_omp
+│   │   │   ├── mpi_omp_avx
+│   │   │   ├── mpi_omp_avx_Ofast
+│   │   │   ├── omp
+│   │   │   └── seq_blk
+│   │   ├── results
+│   │   │   ├── mpi.csv
+│   │   │   ├── mpi_avx.csv
+│   │   │   ├── mpi_omp.csv
+│   │   │   ├── mpi_omp_avx.csv
+│   │   │   ├── mpi_omp_avx_blk_tr.csv
+│   │   │   ├── mpi_omp_avx_blk_tr_Of.csv
+│   │   │   ├── omp.csv
+│   │   │   └── seq_blk.csv
+│   │   └── to_test
+│   │       ├── mpi
+│   │       │   ├── SUMMA_.c
+│   │       │   ├── cannon_2.c
+│   │       │   └── fox_3.c
+│   │       ├── mpi_avx
+│   │       │   └── SUMMA_vect.c
+│   │       ├── mpi_omp
+│   │       │   └── SUMMA_.c
+│   │       ├── mpi_omp_vect
+│   │       │   └── SUMMA_vect.c
+│   │       ├── omp
+│   │       │   └── mult_mat_omp.c
+│   │       ├── seq
+│   │       │   └── mult_mat_seq_blocking.c
+│   │       └── vecto.c
+│   ├── include
+│   │   ├── headers
+│   │   │   ├── affichage.h
+│   │   │   ├── energy_monitor.h
+│   │   │   ├── for_fox.h
+│   │   │   ├── gest_arg.h
+│   │   │   ├── lecture_mat.h
+│   │   │   ├── resize.h
+│   │   │   ├── stability.h
+│   │   │   └── vecto.h
+│   │   └── sources
+│   │       ├── affichage.c
+│   │       ├── energy_monitor.c
+│   │       ├── for_fox.c
+│   │       ├── gest_arg.c
+│   │       ├── lecture_mat.c
+│   │       ├── resize.c
+│   │       ├── stability.c
+│   │       └── vecto.c
+│   ├── parallele
+│   │   ├── SUMMA_.c
+│   │   ├── SUMMA_vect.c
+│   │   ├── cannon_2.c
+│   │   ├── fox_2.c
+│   │   ├── fox_3.c
+│   │   ├── mlt_mat_prl_blk.c
+│   │   ├── mult_bcast_blk.c
+│   │   └── mult_send_rcv_replace.c
+│   └── seq
+│       ├── mult_mat_seq_blocking.c
+│       ├── mult_mat_seq_vecto.c
+│       └── mult_mat_seq_vecto_tr.c
+└── version.txt
+
+202 directories, 308 files

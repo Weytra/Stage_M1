@@ -1,0 +1,717 @@
+---
+title: "Untitled"
+author: "GUILHEM"
+date: "2026-06-23"
+output: html_document
+---
+
+
+```{r}
+mean_res = infect_seq_gl
+### temps algo
+p <- Mean_res %>% 
+  filter(exec == "seq") %>% 
+  ggplot(aes(
+    x = pct_infect,
+    y = A_time,
+    color = interaction(size,nb_indiv,sep="_"),
+    group = size,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ opt) +
+  geom_line() +
+  geom_point() +
+  labs(color = "Taille (size)") +
+  theme_minimal()
+
+ggplotly(p, tooltip = "text")
+```
+
+On remarque ici que pour la version sequetielle de base le pourcentage d'individus infecter semble ne pas avoir réelement d'impact, on remarque un leger gain de performance quand le %age 
+augmente que je n'explique pas.
+On voit que mis a part O0 qui fait des siennes, les optimisation du compilateur n'apporte aucune difference de temps a l'execution, le peu que l'on peu avoir reste largement dans l'imprecision machine. Il n'y a rien de plus a signaler concernant l'energie consomé.
+
+```{r}
+p <- Mean_res %>%
+  filter(pct_infect == 30) %>% 
+  filter(exec %in% c("seq_C_friendly", "seq_C_NO_friendly")) %>% 
+  ggplot(aes(
+    x = size,
+    y = A_energie,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  labs(color = "nb_indiv") +
+  theme_minimal()
+
+ggplotly(p, tooltip = "text")
+
+```
+
+Ici on regarde l'interet de faire bien ordonnée nos structures, la version C_friendly limite
+au maximum la taille de chaque structure a son minimum alors que C_NO_fiendly augmente volontairement la taille de la structure de facon significative, on constate ici une diference de temps entre les deux a l'avantage de celle qui reduit la taille de l'ordre de 5% sur le temps mais en revanche et c'est la que c'est surprenant et interesant car pour la premiere fois on a une augmentation de la conso energetique avec la diminution du temps et de la place prise ce qui est tres surprenant 
+Conclu : l'optimisation de l'ordonancement des structures permet un gain de temps leger mais reel
+au detriment d'une potentielle tres legere pénalité énergétique, c'est donc une optimisation qui merite d'etre prise en compte en tant que "finitoion"
+
+cop : Les structures compactes améliorent la localité mémoire, réduisent les stalls et augmentent l’activité des unités de calcul. Cela réduit le temps d’exécution mais augmente légèrement la puissance instantanée, ce qui peut conduire à une consommation énergétique comparable, voire légèrement supérieure, malgré un temps réduit.
+À l’inverse, les structures plus volumineuses provoquent davantage de stalls mémoire, ce qui ralentit l’exécution mais réduit la puissance moyenne du CPU.
+"je reste sceptique la dessus"
+
+
+```{r}
+df_long <- Mean_res %>%
+  filter(pct_infect == 30) %>% 
+  filter(opt == "O3") %>% 
+  filter(exec %in% c("seq", "seq_no_vect","seq_A_vect_forced")) %>% 
+  filter(size <= 400) %>%
+  mutate(
+    A_time_orig    = A_time,
+    A_energie_orig = A_energie
+  ) %>%
+  pivot_longer(
+    cols = c(A_time, A_energie),
+    names_to = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(
+    metric = factor(metric, levels = c("A_time", "A_energie"))
+  )
+
+p <- df_long %>%
+  ggplot(aes(
+    x = size,
+    y = value,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :", nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>A_time :", round(A_time_orig, 3), " s",
+      "<br>A_energie :", round(A_energie_orig, 3), " J",
+      "<br>metric affichée :", metric,
+      "<br>value :", round(value, 3)
+    )
+  )) +
+  facet_grid(metric ~ exec, scales = "free_y") +
+  geom_line() +
+  geom_point() +
+  labs(color = "nb_indiv") +
+  theme_minimal()
+
+ggplotly(p, tooltip = "text")
+
+
+
+
+```
+
+Ici les resultats sont très interessant ! Meriterais d'etre relancer pour verifier que ca soit correct !
+On a tout d'abord une analyse concernant le temps, on voit clairement que la version de base est plus rapide en temps que la version non vectoriser ou avec vectorisation forcé. Le gain est de l'ordre de 10 a 20% entre seq par rapport au deux autres.
+Concernant la vectorisation forcé on voit que en terme de temps il est le pire de tous, mais proche de no_vect, cependant avec un pourcentage d'infecté élevé on a un temps qui explose.
+Concernant l'energie, on a ici un resultat tres interresant, les deux algos les moins rapides sont les plus econome en energie, et de beaucoup ! Allant de 20% dans le pire cas, a 50% dans les meilleurs cas (par exemple entre seq et no vect en size 400/5000) ce qui represente un gain vraiment consequent par rapport a la différence de temps, celon le parametre voulant etre optimiser il serais donc interesant de forcer a ne pas vectoriser pour ce programme.
+
+
+
+PASSON A MPI
+
+On manque de données mais il apparait ici sur la seule donnee disponible que la taille des structures affectre effectivement la rapidite de l'ordre ici de 30%, mais serrait 2 fois plus econome !?
+
+```{r}
+p <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(exec == "mpi") %>% 
+  filter(nb_indiv==20000) %>% 
+  filter(size <=400) %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(opt),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>np :",np,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ np) +
+  geom_line() +
+  geom_point() +
+  labs(color = "nb_indiv") +
+  theme_minimal()
+
+ggplotly(p, tooltip = "text")
+
+```
+
+Analyse des optimisation : ici on constate que l'optimisation O0 est catastrophioque, elle est en moyenne 30% plus lente. O3 et Ofast sont tres proche, mais O3 reste plus stable dans ces performance, pour cela ca serras l'optimisation utiliser par la suite pour les autres test
+
+on changeant l'axe x par A_energie on constate que les deux graphique ce superpose parfaitement, donc ici le temps d'execution est parfaitement correller a l'energie consomé
+
+
+```{r}
+p <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(opt == "O3") %>% 
+  ggplot(aes(
+    x = size,
+    y = A_energie,
+    color = factor(np),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>np :",np,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  labs(color = "nb_indiv") +
+  theme_minimal()
+
+p <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(exec=="mpi_C_no_friendly") %>% #varier avec les autres exec !
+  filter(opt == "O3") %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time, # faire varier avec energie !
+    color = factor(np),
+    group = np,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>np :",np,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ nb_indiv) +
+  geom_line() +
+  geom_point() +
+  labs(color = "nb proc") +
+  theme_minimal()
+
+ggplotly(p, tooltip = "text")
+
+```
+/!\ ne pas comparer "mpi_big" avec les autres, il y a 500j contre seulement 200 pour les autres !
+sur le graph "mpi" on voit que 8 et 12 processus sont tres proche, et 16 et 4 egalement, donc pour de petit probleme de cette taille il n'est pas utile d'avoir plus de processus, 12 etant l'ideal pour des petite taille, en revanche lorsque l'on bascule sur de plus grande taille et que l'on regarde les deux autres graphique on remarque bien un net avantage pour la config avec 16 processus excepté lorsque la grille de la simulation a une faible densité, dans ce cas la difference de temps celon le nombre de processus s'ettenue enormement avec un aventage pour 12 processus. La difference entre les nombre de processus varie de ~0% jusqu'à +65%.
+Et concernant l'energeie on remarque souvent que l'energie baisse avec le temps mais pas de facon lineaire, plutot logarithmiquement ave la diminution du temps
+
+Pour l’algorithme mpi_big, le scaling MPI dépend fortement de la taille du problème.
+Pour les petites et moyennes tailles (ex. size = 1200), l’utilisation de 16 processus n’apporte pas de gain significatif, voire peut être légèrement moins efficace que 8 ou 12 processus, en raison du coût de communication.
+En revanche, pour les grandes tailles, le parallélisme devient pleinement exploitable et 16 processus offre systématiquement le meilleur temps d’exécution.
+
+Pour mpi_C_no_friendly on constate que le scaling est bien moin bon surtout sur de petite taille, la difference entre les procesus apparait a partir de 40000 individus sur la grille, avant cela, passe de 16 a 8 processus ne coute pas plus de temps, ou extremement peu (-5%) mais fait de grosse difference energetique de l'ordre de 20%, et jusqu'a 30% (quand les temps ce superpose)
+concernant l'energie pure, on constate comme entendu que 16 processus cause une augmentation de la consomation energetique, en revanche 4 n'est pas le plus econome mais il s'agit en faite de  8 qui est le plus econome pour la meme tache, de l'orde de 10 a 30% de diference d'energie
+
+Enfin en comparant visualement les temps et la conso d'energie on constate que pour des consideration energetique il peux etre interesant de ce limiter a 8 procesus au lieu de 16, sachant que l'augmentation du temps d'execution se verra reaplique en tant que gain energetique (ie + long mais moins energivore)
+
+
+point de repere par raport au sequentielle : on a un gain de temps de /3 et energie /2
+
+
+Encore besoin de verifier tout ca ! 
+nouveau bench : coche firendly  et no_fiendly excatement les meme valeur a 1% pret
+et par rapport a l'ancien no fiendly, le nouveau est un poil plus rapide mais consome 2x plus, c'est tres etrange
+
+
+OPEN MP !
+
+```{r}
+
+p <- Mean_res %>%
+  filter(pct_infect == 30) %>%
+  filter(exec == "omp") %>% 
+  filter(nb_indiv==20000) %>% 
+  filter(size <=400) %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(opt),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  labs(color = "nb_indiv") +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+```
+
+Ici pour les optimisation meme constat, O0 est a la traine tandis que les autres sont superposés presque parfaitement, idem pour l'energie.
+
+
+
+```{r}
+p <- Mean_res %>%
+  filter(size <=400) %>% 
+  filter(opt=="O3") %>% 
+  filter(pct_infect==30) %>% 
+  filter(exec != "omp_big") %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+```
+
+Avec ce graphique on a des resultat tres interesant, ici on voit une tres forte différence de temps d'execution entre les diffrente version, commencon par la moin flagrante, entre omp et omp_C_Friendly, qui est cense etre plus rapide car elle prend moin de place en memoire ce trouve en faite etre plus lente que la verison sans cette optimisation de l'ordre de 15%, en revanche cette meme verison qui dure plus longtemps ce trouve etre plus econome en energie a hauteur de +33% ce qui est enorme ! 
+il va donc falloir que je refasse ce bench pour massurer que je ne me suis pas trompé car on touche a un point tres interesant ou une optimisation serais plus couteuse en temps mais moin en energie !
+
+Enfin le deuxiemme poitn plus flagrant est la difference de temps entre la verison ompe tomp_v2, poiur rappelle omp paralelise toute les partie meme lorsque c'est complexe ce qui causse beaucoup de free/realoc, tandi que la V2 parallelise que lorsque cela est trivial, et il s'aver ici qu'elle est donc infiniment plus rapide que la v1, sur des petite taille la diference est deja de 30%, avec un gain energitique a l'avantage de la v2 de 70%, et pour les grosse taille on voit que la V1 augmente exponentiellement tandi que la v2 augmente de facon logarithmique.
+pour la taille maximale de ce graphique on constate une diffrence de l'odre de 10 aussi bien en temps qu'en energie consomé !
+
+en par rapport a la version sequentielle on aurrait aucun gain ni en temps ni en energie, bizare, a verifier 
+
+
+```{r}
+p <- Mean_res %>%
+  filter(exec =="omp_v2") %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(pct_infect),
+    group = pct_infect,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ nb_indiv) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+```
+on voit ici un resultat surprenantn le temps d'execution est plus long lorsque le %age d'infecter diminue, veritoion de 10% pour 4 x + d'individus infecté, cette aspect n'avais pas ete vue jusqua present.
+
+_________ HYBRID ______________
+
+
+```{r}
+p <- Mean_res %>%
+  filter(pct_infect==30) %>%
+  filter(opt == "O3") %>%#  filter(exec %in% c("hybrid","mpi","omp_v2","seq")) %>% 
+  ggplot(aes(
+    x = size,
+    y = A_energie,
+    color = factor(nb_indiv),
+    group = omp_threads,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>np :", np,
+      "<br>omp_thr :", omp_threads,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ np) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+```
+
+Ici sur la verison hybrid on voit deux tendence, premierement le temps diminue lineairement avec le nombre de processus, en revanche le nombre de thred ne semble pas affecter le temps d'execution, ou alors de tres peu, ce qui est vraiment surprenant.
+La scalabilite sur le nombre de processus est presque parfaite, on passe de 3.5s avec bp 2 a 1.8 np 4 a 1.1 pour np = 8
+Je le repete mais tres etonament le nombre de thread n'affecte pas le temps ici, je vais refaire les bench par securité.
+Et conceant l'energie la tendence est exactement la meme que le temps, la difference entre les differtente courbe et juste un peu plus fines, et cette fois (comme d'habitude) plus le temps et court donc plus on a de processus mpi (le nb de thread n'ayant pas d'effet) plus la consomation diminue.
+
+
+
+____________ GLOBAL _________
+
+
+```{r}
+
+p <- Mean_res %>%
+  filter(pct_infect==30) %>% 
+  filter(nb_indiv<40000) %>%
+  filter(size <=400) %>% 
+  filter(opt == "O3") %>%
+  filter(np %in% c(1,8)) %>% 
+  filter(exec %in% c("hybrid","mpi","omp_v2","seq")) %>% #on sort omp pour mieux voir
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+```
+L’analyse globale des différentes versions de l’algorithme montre d’abord que la version OpenMP avancée (omp_v2), qui parallélise agressivement en s’appuyant sur de nombreux malloc/free/realloc, est de loin la pire en temps d’exécution. Elle dégrade tellement les performances qu’il est pertinent de l’exclure des comparaisons suivantes.
+
+Une fois omp_v2 écartée, la hiérarchie en temps devient plus lisible : la version séquentielle naïve n’est pas la plus mauvaise, la véritable lanterne rouge reste omp_v2, tandis que la version MPI est clairement la meilleure, avec un speedup significatif de 3.5. La version hybride MPI+OMP se situe logiquement entre MPI pur et la version séquentielle. On obtient donc, en termes de temps d’exécution :
+mpi < mpi_hybrid < seq < omp_v2.
+
+L’analyse énergétique raconte une histoire différente et plus intéressante. La version séquentielle est la plus énergivore, avec une consommation plus de deux fois supérieure à la meilleure version. La version MPI permet déjà un gain d’environ 30 % d’énergie, la version OMP autour de 43 %, et la version hybride combine les avantages des deux en devenant la plus économe, avec une réduction de 50 à 60 % de l’énergie consommée. L’ordre en énergie est donc :
+hybrid < mpi < omp < seq.
+
+En conclusion, la version hybride est la plus efficace énergétiquement, tandis que la version séquentielle est la plus coûteuse, avec un écart de 30 à 60 % selon les cas. En temps d’exécution, la version MPI est la meilleure et omp_v2 la pire. Il est particulièrement frappant de constater que la combinaison des deux extrêmes en temps (MPI rapide et OMP moins performant) aboutit à la meilleure performance énergétique. Cette tendance se retrouve aussi sur la puissance moyenne : environ 8,5 W pour OMP, 19 W pour la version séquentielle, 20 W pour MPI, et seulement 13 W pour l’hybride, ce qui représente des écarts très significatifs.
+
+Deux versions se démarquent nettement. La version hybride apparaît comme la plus équilibrée : elle offre un bon compromis entre rapidité et consommation énergétique, ce qui en fait la solution la plus efficace globalement. À l’inverse, si l’objectif prioritaire est la vitesse brute, la version MPI pure s’impose clairement. Elle est environ deux fois plus rapide que l’hybride, mais cette performance se paie par une hausse d’environ 30 % de l’énergie consommée.
+Résumé général (style rapport scientifique)
+L’analyse comparative des différentes implémentations du modèle SEIR met en évidence des comportements contrastés entre performance temporelle et efficacité énergétique. De manière générale, une version plus rapide tend à consommer moins d’énergie, mais plusieurs cas inverses apparaissent, ce qui souligne l’importance d’étudier simultanément ces deux dimensions. Selon les contraintes du problème réel (temps d’exécution, budget énergétique, disponibilité matérielle), les choix d’optimisation peuvent donc différer.
+
+Resumé :
+Les résultats montrent que l’approche OpenMP n’est pas adaptée à ce modèle. Les fortes dépendances mémoire limitent la parallélisation efficace et conduisent soit à réduire drastiquement les zones parallèles, soit à introduire une complexité importante pour gérer ces dépendances. La version omp_V1, pourtant la plus parallélisée en théorie, illustre parfaitement ce phénomène : elle est la plus lente et la plus énergivore, confirmant que la multiplication des allocations et réallocations est bien plus coûteuse que quelques communications MPI.
+
+À l’inverse, la version MPI se révèle particulièrement performante. Grâce au découpage spatial, les communications se limitent à l’échange des bordures, ce qui représente une fraction très faible de la grille totale. Cette faible intensité de communication explique le speedup observé : la version MPI est environ deux fois plus rapide que la version hybride (par exemple 0,064 s contre 0,227 s), tout en restant raisonnablement efficace énergétiquement (+30 à +40 % d’énergie pour +100 % de vitesse).
+
+La version hybride MPI+OMP constitue un compromis intéressant. Elle n’atteint pas la vitesse de MPI pur, mais elle offre la meilleure efficacité énergétique, avec une réduction de 50 à 60 % de la consommation par rapport à la version séquentielle. Elle se positionne ainsi comme la solution la plus équilibrée lorsque l’on cherche à optimiser simultanément le temps et l’énergie.
+
+En conclusion, si l’objectif principal est la performance brute, la version MPI est la plus pertinente. Si l’objectif est l’efficacité énergétique, la version hybride est la meilleure. Enfin, l’étude montre que les approches théoriquement très parallèles ne sont pas toujours performantes en pratique, et qu’un modèle de parallélisation bien structuré (MPI) peut surpasser des stratégies plus complexes mais mal adaptées (OpenMP avancé).
+
+
+
+
+
+DERNIERE ANALYSE :
+Ne serras pas montrer par les graphique car pas tres interesant en terme de gain mais vectorisation forcé en automatique = meme temps et energie, mais forcé le compilo a ne pas vectorisé apporte un leger gain de temps et d'energie de 4% en seqentielle, pas de gain visible en mpi.
+
+
+```{r}
+p <- Mean_res %>%
+  filter(omp_threads == 2) %>% 
+  filter(size  <=800) %>% 
+  filter(nb_indiv %in% c(10000,20000)) %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(nb_indiv),
+    group = np,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>np :",np,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+```
+
+
+en comparant les deux verison hybrid, l'une sous la base de omp_v1 et l'autre de omp_V2 on vois a nouveau que avec omp_V2 on a un enorme gain de temps avec un speedup de 3, mais une consomation d'energie de 30% supperieur
+donc on a la une version extremement interesante ! 
+
+donc nouveau graphique avec cette nouvelle version : 
+
+```{r}
+Mean_res = Bench_2
+p <- Mean_res %>%
+  filter(pct_infect==30) %>% 
+  filter(nb_indiv<40000) %>%
+  filter(size <=400) %>% 
+  filter(opt == "O3") %>%
+  filter(np %in% c(1,8)) %>% 
+  filter(exec %in% c("hybrid","mpi","omp_v2","seq","hybrid_2")) %>% #on sort omp pour mieux voir
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+```
+
+
+
+```{r}
+Mean_res = Bench_2
+p <- Mean_res %>%
+  filter(opt == "O3") %>%
+  filter(np %in% c(1,8)) %>% 
+  filter(exec %in% c("hybrid_2","mpi")) %>% #,"omp_v2","seq","hybrid_2")) %>% #on sort omp pour mieux voir
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(nb_indiv),
+    group = nb_indiv,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+```
+
+
+
+
+retour sur l'analyse des hybrid : 
+```{r}
+
+
+p <- Mean_res %>%
+  #filter(omp_threads == 2) %>% 
+  filter(exec == "hybrid") %>% 
+  filter(size  <=800) %>% 
+  filter(nb_indiv %in% c(10000,20000)) %>%
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = interaction(nb_indiv,omp_threads,sep="_"),
+    group = np,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>np :",np,
+      "<br>omp : ",omp_threads,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ np) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+```
+
+on constate ici a nouveau que le nombre de thread nas pas d'incidence sur la rapidité de calcul ni le cout energetique, ce qui est surprenant mais qui pourrais etre le signe que seul mpi a une importe ici au vu de la dependence des donnee qui fait que omp ne peut pas paralelise beaucoup
+
+
+```{r}
+
+p <- Mean_res %>%
+  #filter(omp_threads == 2) %>% 
+  filter(np%in%c(4,8)) %>% 
+  filter(size<=800) %>% 
+  filter(nb_indiv %in% c(20000)) %>%
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = interaction(np,omp_threads,sep="_"),
+    group = np,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>np :",np,
+      "<br>omp : ",omp_threads,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+
+```
+
+
+On voit ici aisement que la version hybrid 2 qui ne paralelise que ce qu'il est facile de paralelisé s'avere etre plus rapide et de beaucoup, on a un speed up de 1.8 ce qui est consequent. en revanche en terme d'energie c'est cette fois ci beaucoup moins bon car on ce retrouve avec une augmentation de l'ordre de 70% a 100% par rapport a la version hybride_V1.
+Ici le rato gain de temps/energie est donc quasi nul, la methode a prefere serra donc a decider en fonction du probleme choisit.
+on remarque que la puissance pour la V2 est de 45W contre seulement 13 pour la V1, ce qui signifie donc que le cpu est bien plus utilisé dans la V2.
+
+```{r}
+
+p <- Mean_res %>%
+  #filter(omp_threads == 2) %>% 
+  filter(exec %in% c("seq","omp_v2","mpi__big","hybrid","hybrid_2")) %>% 
+  filter(nb_indiv<20001) %>% 
+  filter(pct_infect ==30) %>% 
+  filter(np %in% c(1,8,16)) %>% 
+  filter(size <=800) %>% 
+  filter(opt == "O3") %>% 
+  ggplot(aes(
+    x = size,
+    y = A_time,
+    color = factor(nb_indiv),
+    group = np,
+    text = paste(
+      "Algo :", exec,
+      "<br>opt :", opt,
+      "<br>size :", size,
+      "<br>omp : ",omp_threads,
+      "<br>np :",np,
+      "<br>nb_indiv :",nb_indiv,
+      "<br>% infectés :", pct_infect,
+      "<br>Temps :", round(A_time, 3), "s",
+      "<br>Énergie :", round(A_energie, 3), "J",
+      "<br>Power :", round(A_power, 3)
+    )
+  )) +
+  facet_wrap(~ exec) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
+
+ggplotly(p, tooltip = "text")
+
+
+write.csv(Mean_res, "infect_global.csv", row.names = TRUE)
+```
+
+enfin ici sur le dernier graphique qui reprend les meilleurs des algos 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
